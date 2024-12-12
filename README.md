@@ -89,6 +89,7 @@ Run the pre-deployment script and then deploy:
 ```bash
 npm run predeploy
 serverless deploy
+```
 
 **What happens during deployment?**
 
