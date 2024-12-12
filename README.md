@@ -112,6 +112,7 @@ curl -X POST \
   https://<api-id>.execute-api.<region>.amazonaws.com/<stage>/flows/myFlow1 \
   -H "Content-Type: application/json" \
   -d '{"key":"value"}'
+```
 
 A successful response returns the `executionArn` of the started execution.
 
@@ -124,16 +125,20 @@ To add a new flow:
    ```bash
    npm run predeploy
    serverless deploy
+   ```
 
 3. Invoke the new flow:
    ```bash
    curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/<stage>/flows/myFlowNew
+   ```
+
 
 ### Cleaning Up
 
 To remove all resources:
 ```bash
 serverless remove
+```
 
 This removes deployed functions, state machines, and other AWS resources created by the stack.
 
