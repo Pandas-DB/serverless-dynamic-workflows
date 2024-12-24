@@ -1,8 +1,15 @@
-Comment: "A flow that runs the Hello World Lambda"
-StartAt: HelloState
-States:
-  HelloState:
-    Type: Task
-    Resource: arn:aws:lambda:eu-west-1:123456789012:function:hello_world
-    End: true
+# flows/helloWorldFlow.yml
+name: helloWorldFlow
+description: A simple hello world workflow
+definition:
+  StartAt: HelloWorld
+  States:
+    HelloWorld:
+      Type: Task
+      Resource: "${HelloWorldFunctionArn}"  # This will be replaced using Fn::Sub
+      End: true
 
+functions:
+  - name: HelloWorldFunction
+    handler: functions/hello_world/handler.handler
+    runtime: python3.9
