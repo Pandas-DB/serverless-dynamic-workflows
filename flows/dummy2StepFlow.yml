@@ -1,0 +1,22 @@
+# flows/dummy2StepFlow.yml
+name: dummy2StepFlow
+description: A dummy two-step data processing pipeline
+definition:
+  StartAt: GenerateRandom
+  States:
+    GenerateRandom:
+      Type: Task
+      Resource: "${RandomGeneratorFunctionArn}"
+      Next: TransformRandom
+    TransformRandom:
+      Type: Task
+      Resource: "${TransformRandomFunctionArn}"
+      End: true
+
+functions:
+  - name: RandomGeneratorFunction
+    handler: scripts/random_generator.handler
+    runtime: python3.9
+  - name: TransformRandomFunction
+    handler: scripts/transform_random_generator.handler
+    runtime: python3.9

@@ -1,154 +1,195 @@
-# Serverless Dynamic Flows
+# Serverless Dynamic Workflows
 
-**Serverless Dynamic Flows** is a template repository that demonstrates how to dynamically generate, deploy, and run AWS Step Functions state machines based on separate flow definition files. Each flow definition is an isolated YAML file in the `flows/` directory. During the build process, the repository automatically discovers these flow files, creates a combined index, and deploys them as state machines. A single API endpoint (via API Gateway and Lambda) then provides a way to trigger any available flow by name.
+**Serverless Dynamic Workflows** allows you to create and deploy Python script workflows triggered by an API REST so that you do not need to think of infrastructure
+
+### Back-End Definition
+
+**Serverless Dynamic Workflows** is a serverless application that enables dynamic creation and execution of AWS Step Functions workflows through YAML definitions. Each workflow is defined in a separate file in the `flows/` directory and is automatically deployed as a state machine. The application provides authenticated API endpoints to execute and manage these workflows.
 
 ## Key Features
 
-- **Dynamic Flow Discovery:**  
-  Flow definitions are kept in the `flows/` directory. No manual editing of `serverless.yml` is required when a new flow is added.
-  
-- **Automatic Step Function Creation:**  
-  A pre-deployment script scans the `flows/` directory, generates an index file, and references them in `serverless.yml` via the Serverless Step Functions plugin.
-  
-- **Single Entry Point API:**  
-  The `run_flow` Lambda function exposes a single API endpoint. By passing a `flow_name` path parameter, you can start the corresponding state machine execution.
-  
-- **Flexible and Scalable:**  
-  Add new flows by simply adding a new `.yml` file into the `flows/` directory. The next deployment automatically includes it as a new state machine.
+- **Dynamic Flow Discovery**: Flows are defined in YAML files and automatically deployed as Step Functions
+- **Single API Entry Point**: Execute any flow through a unified REST API
+- **Cognito Authentication**: Secure API endpoints with JWT tokens
+- **Simple Flow Definitions**: Define workflows in YAML with automatic Lambda creation
+- **Admin Tools**: Easy user management and token generation
+- **Testing Tools**: Built-in flow testing capabilities
 
-## Architecture Overview
+## Repository Structure
 
-1. **Flows Directory:**  
-   Each file in `flows/` defines a Step Functions state machine in YAML or JSON format. For example:
-   ```yaml
-   Comment: "A simple flow"
-   StartAt: InitialState
-   States:
-     InitialState:
-       Type: Task
-       Resource: arn:aws:lambda:eu-west-1:123456789012:function:my-initial-lambda
-       Next: NextState
-     NextState:
-       Type: Pass
-       End: true
+```
+serverless-dynamic-workflows/
+├── admin_tools/                # Admin utilities
+│   ├── create_user.py         # Create Cognito users
+│   └── get_user_token.py      # Generate authentication tokens
+├── deploy/                    # Deployment scripts
+│   ├── generate_step_functions.js
+│   └── load_flows.js
+├── flows/                     # Flow definitions, where you specify your scripts workflow
+│   ├── dummy2StepFlow.yml
+│   └── helloWorldFlow.yml
+├── functions/                 # API Lambda handlers
+│   ├── auth/                 # Authentication endpoints
+│   ├── list_flows/          # List available flows
+│   └── run_flow/            # Execute flows
+├── scripts/                  # Flow Lambda functions. Where you put your Python scripts
+│   ├── hello_world.py
+│   ├── random_generator.py
+│   └── transform_random_generator.py
+├── test/                     # Test utilities
+│   ├── api/                 # API tests
+│   │   └── test_list_flows.py
+│   └── flows/              # Flow tests
+│       ├── test_flow_dummy_2step.py
+│       └── test_flow_hello_world.py
+├── layer/                   # Lambda layers
+│   └── requirements.txt
+└── serverless.yml          # Infrastructure definition
+```
 
-2. **Pre-deployment Script:**  
-   Before deployment, `scripts/build_flows_map.js` runs. It:
-   - Lists all `.yml` files in `flows/`.
-   - Generates `flows/index.yml`, containing references to all discovered flows.
-   - Creates a `flows_map.json` file mapping flow names to their state machine logical IDs.
+## Prerequisites
 
-3. **Serverless Framework Deployment:**  
-   `serverless.yml` is configured to:
-   - Use the `index.yml` file to define Step Functions state machines.
-   - Deploy the `run_flow` Lambda and other functions.
-   - Set up an API Gateway endpoint that forwards requests to `run_flow`.
+- Python 3.9+
+- Node.js 14+
+- AWS CLI configured
+- Serverless Framework (`npm install -g serverless`)
 
-4. **Run Flow Endpoint:**  
-   The `run_flow` Lambda handler reads the `flow_name` from the request path and uses it to look up the corresponding state machine ARN. It then calls `StartExecution` on that state machine.
+## Installation
 
-## Getting Started
-
-### Prerequisites
-
-- **Node.js and NPM:**  
-  Needed to run scripts and install the Serverless Framework.
-  
-- **Serverless Framework:**  
-  Install globally or locally:
-  ```bash
-  npm install -g serverless
-
-- **AWS Credentials:**  
-  Configure your environment:
-  ```bash
-  aws configure
-
-### Installation
-
-1. **Clone the Repo:**
-   ```bash
-   git clone https://github.com/your-username/serverless-dynamic-flows.git
-   cd serverless-dynamic-flows
-
-2. **Install Dependencies:**
-   ```bash
-   npm install
-
-3. **Add or Modify Flow Files (Optional):** Add your flow definitions in flows/. For example:
-
-cp examples/myFlow1.yml flows/
-
-You can have multiple files like myFlow2.yml, myFlow3.yml, etc
-
-
-### Deployment
-
-Run the pre-deployment script and then deploy:
-
+1. Clone the repository:
 ```bash
-npm run predeploy
+git clone https://github.com/your-username/serverless-dynamic-workflows.git
+cd serverless-dynamic-workflows
+```
+
+2. Install dependencies:
+```bash
+# Install Node.js dependencies
+npm install
+
+# Install Python dependencies
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r layer/requirements.txt
+```
+
+## Deployment
+
+Deploy the application:
+```bash
 serverless deploy
 ```
 
-**What happens during deployment?**
+## Authentication Setup
 
-- The `predeploy` script (`scripts/build_flows_map.js`) runs and generates `flows/index.yml` and `flows/flows_map.json`.
-- The `serverless deploy` command:
-  - Deploys all state machines defined in `index.yml`.
-  - Deploys the `run_flow` function and others defined in `serverless.yml`.
-  - Sets up an API Gateway endpoint at:  
-    `https://<api-id>.execute-api.<region>.amazonaws.com/<stage>/flows/{flow_name}`
-    
-    
-### Usage
-
-**Starting a Flow Execution:**
-
-Once deployed, trigger a flow by its name:
-
+1. Create a new user:
 ```bash
-curl -X POST \
-  https://<api-id>.execute-api.<region>.amazonaws.com/<stage>/flows/myFlow1 \
-  -H "Content-Type: application/json" \
-  -d '{"key":"value"}'
+./admin_tools/create_user.py --email your@email.com
 ```
 
-A successful response returns the `executionArn` of the started execution.
+2. Get an authentication token:
+```bash
+./admin_tools/get_user_token.py --email your@email.com
+```
 
-### Adding New Flows
+## Usage
 
-To add a new flow:
+### Listing Available Flows
 
-1. Create a new file in `flows/`, e.g. `myFlowNew.yml`.
-2. Re-run the pre-deployment and deploy:
-   ```bash
-   npm run predeploy
-   serverless deploy
-   ```
+```bash
+./test/api/test_list_flows.py
+```
 
-3. Invoke the new flow:
-   ```bash
-   curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/<stage>/flows/myFlowNew
-   ```
+Example output:
+```
++------------------+---------------------------------+--------+---------------------+
+| Name             | Description                     | States | Created            |
++==================+=================================+========+=====================+
+| dummy2StepFlow   | A dummy two-step data pipeline | 2      | 2024-12-24T10:00Z  |
+| helloWorldFlow   | A simple hello world workflow   | 1      | 2024-12-24T09:30Z  |
++------------------+---------------------------------+--------+---------------------+
+```
 
+### Running a Flow
 
-### Cleaning Up
+```bash
+./test/flows/test_flow_dummy_2step.py --input '{"test": true}'
+```
 
-To remove all resources:
+### Creating a New Flow
+
+1. Create a flow definition in `flows/`:
+```yaml
+# flows/myNewFlow.yml
+name: myNewFlow
+description: My new workflow
+definition:
+  StartAt: FirstStep
+  States:
+    FirstStep:
+      Type: Task
+      Resource: "${FirstStepFunctionArn}"
+      End: true
+
+functions:
+  - name: FirstStepFunction
+    handler: scripts/my_script.handler
+    runtime: python3.9
+```
+
+2. Add your Lambda function in `scripts/`:
+```python
+# scripts/my_script.py
+def handler(event, context):
+    return {"status": "success", "data": event}
+```
+
+3. Deploy the changes:
+```bash
+serverless deploy
+```
+
+## API Endpoints
+
+- `GET /flows` - List available flows
+- `POST /run/{flow_name}` - Execute a flow
+- `GET /auth/config` - Get Cognito configuration
+- `GET /auth/verify` - Verify authentication token
+
+## Testing
+
+Run API tests:
+```bash
+python -m pytest test/api/
+
+# Test specific flow
+python test/flows/test_flow_dummy_2step.py
+```
+
+## Security
+
+The application uses:
+- Cognito User Pools for authentication
+- JWT tokens for API authorization
+- IAM roles with least privilege
+- DynamoDB for state management
+- Proper CORS configuration
+
+## Cleanup
+
+Remove all deployed resources:
 ```bash
 serverless remove
 ```
 
-This removes deployed functions, state machines, and other AWS resources created by the stack.
-
 ## Contributing
 
-Contributions are welcome! If you have ideas or issues:
-
-1. Open an issue describing the problem or suggestion.
-2. Submit a pull request with proposed changes.
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.txt) file for details.
