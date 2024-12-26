@@ -6,10 +6,10 @@ definition:
   States:
     HelloWorld:
       Type: Task
-      Resource: "${HelloWorldFunctionArn}"  # This will be replaced using Fn::Sub
+      Resource: "${HelloWorldFunctionArn}"
       End: true
 
 functions:
   - name: HelloWorldFunction
-    handler: functions/hello_world/handler.handler
+    handler: hello_world.handler
     runtime: python3.9

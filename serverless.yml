@@ -77,6 +77,16 @@ provider:
           Action:
             - lambda:InvokeFunction
           Resource: "*"
+        - Effect: Allow
+          Action:
+            - states:ListStateMachines
+            - states:DescribeStateMachine
+            - states:ListTagsForResource
+          Resource: "arn:aws:states:${self:provider.region}:*:stateMachine:*"
+        - Effect: Allow
+          Action:
+            - states:DescribeExecution
+          Resource: "arn:aws:states:${self:provider.region}:*:execution:*"
 
 custom:
   flowsDir: flows
@@ -153,18 +163,35 @@ functions:
             name: cognitoAuthorizer
 
   listFlows:
-    handler: functions/list_flows/handler.handler
+      handler: functions/list_flows/handler.handler
+      timeout: 30
+      memorySize: 256
+      package:
+        patterns:
+          - "functions/list_flows/**"
+      layers:
+        - {Ref: DependenciesLambdaLayer}
+      environment:
+        POWERTOOLS_METRICS_NAMESPACE: ${self:service}-flows
+      events:
+        - httpApi:
+            path: /flows
+            method: GET
+            authorizer:
+              name: cognitoAuthorizer
+
+  getFlowResult:
+    handler: functions/get_flow_result/handler.handler
     timeout: 30
     memorySize: 256
-    package:
-      patterns:
-        - "functions/list_flows/**"
-    environment:
-      POWERTOOLS_METRICS_NAMESPACE: ${self:service}-flows
+    layers:
+      - { Ref: DependenciesLambdaLayer }
     events:
       - httpApi:
-          path: /flows
+          path: /run/{flow_name}/{execution_id}
           method: GET
+          authorizer:
+            name: cognitoAuthorizer
 
 layers:
   dependencies:

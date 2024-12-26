@@ -15,8 +15,8 @@ definition:
 
 functions:
   - name: RandomGeneratorFunction
-    handler: scripts/random_generator.handler
+    handler: random_generator.handler
     runtime: python3.9
   - name: TransformRandomFunction
-    handler: scripts/transform_random_generator.handler
+    handler: transform_random_generator.handler
     runtime: python3.9

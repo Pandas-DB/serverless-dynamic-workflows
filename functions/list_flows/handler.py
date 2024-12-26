@@ -2,98 +2,72 @@ import json
 import boto3
 import logging
 from typing import Dict, Any
+import traceback
 
+# Enhanced logging setup
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# Add timestamp and request id to log format
+logging.basicConfig(
+    format='%(asctime)s [%(levelname)s] RequestId: %(aws_request_id)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 sfn = boto3.client('stepfunctions')
 
 
-def get_state_machine_arn(flow_name: str) -> str:
-    """
-    Constructs the State Machine ARN based on the flow name.
-    All state machines are created by the serverless framework using the flow name.
-    """
-    account_id = boto3.client('sts').get_caller_identity()['Account']
-    region = boto3.session.Session().region_name
-    return f"arn:aws:states:{region}:{account_id}:stateMachine:{flow_name}"
-
-
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    Handles the API Gateway event to start a Step Function execution.
+    Handles the API Gateway event to list all available Step Function workflows.
     """
     try:
-        # Extract flow name from path parameters
-        flow_name = event['pathParameters']['flow_name']
+        logger.info(f"Received event: {json.dumps(event, indent=2)}")
 
-        # Get the state machine ARN
-        state_machine_arn = get_state_machine_arn(flow_name)
+        # List all state machines
+        paginator = sfn.get_paginator('list_state_machines')
+        flows = []
 
-        # Parse request body if present, otherwise use empty dict
-        body = {}
-        if event.get('body'):
-            body = json.loads(event['body'])
+        for page in paginator.paginate():
+            for state_machine in page['stateMachines']:
+                # Get detailed info for each state machine
+                details = sfn.describe_state_machine(
+                    stateMachineArn=state_machine['stateMachineArn']
+                )
 
-        # Start the state machine execution
-        response = sfn.start_execution(
-            stateMachineArn=state_machine_arn,
-            input=json.dumps(body)
-        )
-
-        logger.info(f"Started execution of flow {flow_name} with ARN {response['executionArn']}")
+                # Extract flow information
+                flow = {
+                    'name': state_machine['name'],
+                    'created': state_machine['creationDate'].isoformat(),
+                    'definition': json.loads(details['definition']),
+                    'description': details.get('description', 'No description available')
+                }
+                flows.append(flow)
 
         return {
-            "statusCode": 200,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
             },
-            "body": json.dumps({
-                "message": f"Started {flow_name}",
-                "executionArn": response['executionArn'],
-                "status": "SUCCESS"
-            })
-        }
-
-    except sfn.exceptions.StateMachineDoesNotExist:
-        logger.error(f"Flow {flow_name} not found")
-        return {
-            "statusCode": 404,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
-            "body": json.dumps({
-                "error": f"Flow '{flow_name}' not found",
-                "status": "ERROR"
-            })
-        }
-
-    except json.JSONDecodeError:
-        logger.error("Invalid JSON in request body")
-        return {
-            "statusCode": 400,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            },
-            "body": json.dumps({
-                "error": "Invalid JSON in request body",
-                "status": "ERROR"
+            'body': json.dumps({
+                'flows': flows,
+                'count': len(flows)
             })
         }
 
     except Exception as e:
-        logger.error(f"Error starting flow execution: {str(e)}")
+        error_msg = f"Error listing flows: {str(e)}"
+        logger.error(error_msg)
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         return {
-            "statusCode": 500,
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
             },
-            "body": json.dumps({
-                "error": "Internal server error",
-                "status": "ERROR"
+            'body': json.dumps({
+                'error': 'Internal server error',
+                'details': str(e)
             })
         }

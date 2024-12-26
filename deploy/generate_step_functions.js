@@ -1,29 +1,28 @@
-// deploy/generate_step_functions.js
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
+const JSZip = require('jszip');
 
-// Custom YAML types for CloudFormation intrinsic functions
-const getAtt = new yaml.Type('!GetAtt', {
-  kind: 'scalar',
-  construct: function (data) {
-    return { 'Fn::GetAtt': data.split('.') };
-  }
-});
+const cfSchema = yaml.DEFAULT_SCHEMA.extend([
+  new yaml.Type('!GetAtt', {
+    kind: 'scalar',
+    construct: data => ({ 'Fn::GetAtt': data.split('.') })
+  }),
+  new yaml.Type('!Ref', {
+    kind: 'scalar',
+    construct: data => ({ Ref: data })
+  })
+]);
 
-const ref = new yaml.Type('!Ref', {
-  kind: 'scalar',
-  construct: function (data) {
-    return { Ref: data };
-  }
-});
+const createZip = async (handlerCode, handlerName) => {
+  const zip = new JSZip();
+  zip.file(`${handlerName}.py`, handlerCode);
+  return zip.generateAsync({ type: 'base64' });
+};
 
-const cfSchema = yaml.DEFAULT_SCHEMA.extend([getAtt, ref]);
-
-module.exports = () => {
+module.exports = async () => {
   const resources = {};
 
-  // Create Step Functions execution role first
   resources.StepFunctionsExecutionRole = {
     Type: 'AWS::IAM::Role',
     Properties: {
@@ -31,24 +30,18 @@ module.exports = () => {
         Version: '2012-10-17',
         Statement: [{
           Effect: 'Allow',
-          Principal: {
-            Service: 'states.amazonaws.com'
-          },
+          Principal: { Service: 'states.amazonaws.com' },
           Action: 'sts:AssumeRole'
         }]
       },
-      ManagedPolicyArns: [
-        'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-      ],
+      ManagedPolicyArns: ['arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'],
       Policies: [{
         PolicyName: 'StepFunctionsExecutionPolicy',
         PolicyDocument: {
           Version: '2012-10-17',
           Statement: [{
             Effect: 'Allow',
-            Action: [
-              'lambda:InvokeFunction'
-            ],
+            Action: ['lambda:InvokeFunction'],
             Resource: '*'
           }]
         }
@@ -56,49 +49,41 @@ module.exports = () => {
     }
   };
 
-  // Read flow definitions
   const flowsDir = path.join(__dirname, '..', 'flows');
-  const flowFiles = fs.readdirSync(flowsDir).filter(file =>
-    file.endsWith('.yml') || file.endsWith('.yaml')
-  );
+  const flowFiles = fs.readdirSync(flowsDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
 
-  flowFiles.forEach(file => {
-    const flowContent = yaml.load(
-      fs.readFileSync(path.join(flowsDir, file), 'utf8'),
-      { schema: cfSchema }
-    );
+  for (const file of flowFiles) {
+    const flowContent = yaml.load(fs.readFileSync(path.join(flowsDir, file), 'utf8'), { schema: cfSchema });
+    if (!flowContent?.name || !flowContent?.definition) continue;
 
-    if (!flowContent || !flowContent.name || !flowContent.definition) {
-      console.warn(`Skipping invalid flow file: ${file}`);
-      return;
-    }
-
-    // Create Lambda functions defined in the flow
     if (flowContent.functions) {
-      flowContent.functions.forEach(func => {
-        const functionName = func.name;
-        resources[functionName] = {
-          Type: 'AWS::Lambda::Function',
-          Properties: {
-            FunctionName: functionName,
-            Handler: func.handler,
-            Runtime: func.runtime || 'python3.9',
-            Code: {
-              ZipFile: `
-                def handler(event, context):
-                    return {
-                        'statusCode': 200,
-                        'body': 'Hello from ' + context.function_name
-                    }
-              `
-            },
-            Role: { 'Fn::GetAtt': ['IamRoleLambdaExecution', 'Arn'] }
-          }
-        };
-      });
+      for (const func of flowContent.functions) {
+        const [handlerPath] = func.handler.split('.');
+        const sourceFile = handlerPath.replace('scripts/', '') + '.py';
+        const sourcePath = path.join(__dirname, '..', 'scripts', sourceFile);
+        const handlerName = sourceFile.replace('.py', '');
+
+        try {
+          const sourceCode = fs.readFileSync(sourcePath, 'utf8');
+          const zipContent = await createZip(sourceCode, handlerName);
+
+          resources[func.name] = {
+            Type: 'AWS::Lambda::Function',
+            Properties: {
+              FunctionName: func.name,
+              Handler: `${handlerName}.handler`,
+              Runtime: func.runtime || 'python3.9',
+              Code: { ZipFile: zipContent },
+              Role: { 'Fn::GetAtt': ['IamRoleLambdaExecution', 'Arn'] }
+            }
+          };
+        } catch (error) {
+          console.error(`Error processing function ${func.name}:`, error);
+          continue;
+        }
+      }
     }
 
-    // Prepare variables for Fn::Sub
     const variables = {};
     if (flowContent.functions) {
       flowContent.functions.forEach(func => {
@@ -106,12 +91,10 @@ module.exports = () => {
       });
     }
 
-    // Create state machine
     resources[`${flowContent.name}StateMachine`] = {
       Type: 'AWS::StepFunctions::StateMachine',
-      DependsOn: ['StepFunctionsExecutionRole'].concat(
-        flowContent.functions?.map(f => f.name) || []
-      ),
+      DependsOn: ['StepFunctionsExecutionRole']
+        .concat(flowContent.functions?.map(f => f.name) || []),
       Properties: {
         StateMachineName: flowContent.name,
         DefinitionString: {
@@ -123,7 +106,7 @@ module.exports = () => {
         RoleArn: { 'Fn::GetAtt': ['StepFunctionsExecutionRole', 'Arn'] }
       }
     };
-  });
+  }
 
   return { Resources: resources };
 };
