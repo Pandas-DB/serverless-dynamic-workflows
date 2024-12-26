@@ -109,12 +109,12 @@ package:
 
 functions:
   getAuthConfig:
-    handler: functions/auth/handler.get_config
+    handler: functions/base/auth/handler.get_config
     timeout: 30
     memorySize: 128
     package:
       patterns:
-        - "functions/auth/**"
+        - "functions/base/auth/**"
     layers:
       - {Ref: DependenciesLambdaLayer}
     environment:
@@ -127,12 +127,12 @@ functions:
           method: GET
 
   verifyToken:
-    handler: functions/auth/handler.verify_token
+    handler: functions/base/auth/handler.verify_token
     timeout: 30
     memorySize: 128
     package:
       patterns:
-        - "functions/auth/**"
+        - "functions/base/auth/**"
     layers:
       - {Ref: DependenciesLambdaLayer}
     environment:
@@ -145,12 +145,12 @@ functions:
             name: cognitoAuthorizer
 
   runFlow:
-    handler: functions/run_flow/handler.handler
+    handler: functions/base/run_flow/handler.handler
     timeout: 30
     memorySize: 256
     package:
       patterns:
-        - "functions/run_flow/**"
+        - "functions/base/run_flow/**"
     layers:
       - {Ref: DependenciesLambdaLayer}
     environment:
@@ -163,12 +163,12 @@ functions:
             name: cognitoAuthorizer
 
   listFlows:
-      handler: functions/list_flows/handler.handler
+      handler: functions/base/list_flows/handler.handler
       timeout: 30
       memorySize: 256
       package:
         patterns:
-          - "functions/list_flows/**"
+          - "functions/base/list_flows/**"
       layers:
         - {Ref: DependenciesLambdaLayer}
       environment:
@@ -181,7 +181,7 @@ functions:
               name: cognitoAuthorizer
 
   getFlowResult:
-    handler: functions/get_flow_result/handler.handler
+    handler: functions/base/get_flow_result/handler.handler
     timeout: 30
     memorySize: 256
     layers:
