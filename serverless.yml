@@ -193,6 +193,9 @@ functions:
           authorizer:
             name: cognitoAuthorizer
 
+plugins:
+  - ./deploy/serverless-dynamic-functions.js
+
 layers:
   dependencies:
     path: layer
@@ -201,7 +204,7 @@ layers:
       - python3.9
 
 resources:
-  - ${file(./deploy/generate_step_functions.js)}
+  - ${file(./deploy/generate-step-functions.js)}
   - Resources:
       MetadataTable:
         Type: AWS::DynamoDB::Table

@@ -1,10 +1,16 @@
 # Serverless Dynamic Workflows
 
-**Serverless Dynamic Workflows** allows you to create and deploy Python script workflows triggered by an API REST so that you do not need to think of infrastructure
+**Serverless Dynamic Workflows** allows you to create, deploy and call Python scripts in two ways:
+1. As standalone REST endpoints - simply add your Python scripts to `functions/lib/` and it automatically gets its own authenticated endpoint
+2. As part of workflows - combine multiple Python scripts into workflows
 
 ### Back-End Definition
 
-**Serverless Dynamic Workflows** is a serverless application that enables dynamic creation and execution of AWS Step Functions workflows through YAML definitions. Each workflow is defined in a separate file in the `flows/` directory and is automatically deployed as a state machine. The application provides authenticated API endpoints to execute and manage these workflows.
+**Serverless Dynamic Workflows** is a serverless application that:
+- Auto-generates REST endpoints from Python functions in `functions/lib/`
+- Enables creation of multi-step workflows through YAML definitions in `flows/`
+- Deploys workflows as AWS Step Functions state machines
+- Provides authenticated API endpoints to execute and manage both standalone functions and workflows
 
 ## Key Features
 
@@ -14,6 +20,8 @@
 - **Simple Flow Definitions**: Define workflows in YAML with automatic Lambda creation
 - **Admin Tools**: Easy user management and token generation
 - **Testing Tools**: Built-in flow testing capabilities
+- **Auto-generated Endpoints**: Each function in lib/ automatically gets its own REST endpoint under the `/lib` prefix
+- **Plugin-based Function Loading**: Uses a custom Serverless plugin to dynamically load and configure library functions
 
 ## Repository Structure
 
@@ -24,24 +32,23 @@ serverless-dynamic-workflows/
 │   └── get_user_token.py      # Generate authentication tokens
 ├── deploy/                    # Deployment scripts
 │   ├── generate_step_functions.js
+│   ├── generate_lib_functions.js
 │   └── load_flows.js
-├── flows/                     # Flow definitions, where you specify your scripts workflow
+├── flows/                     # Flow definitions
 │   ├── dummy2StepFlow.yml
 │   └── helloWorldFlow.yml
-├── functions/                 # API Lambda handlers
-│   ├── auth/                 # Authentication endpoints
-│   ├── list_flows/          # List available flows
-│   └── run_flow/            # Execute flows
-├── scripts/                  # Flow Lambda functions. Where you put your Python scripts
-│   ├── hello_world.py
-│   ├── random_generator.py
-│   └── transform_random_generator.py
+├── functions/                 # Lambda functions
+│   ├── base/                 # Core functionality
+│   │   ├── auth/            # Authentication endpoints
+│   │   ├── list_flows/      # List available flows
+│   │   └── run_flow/        # Execute flows
+│   └── lib/                  # Reusable functions
+│       ├── hello_world/     # Each folder becomes an endpoint
+│       ├── ping/
+│       └── dummy_check/
 ├── test/                     # Test utilities
 │   ├── api/                 # API tests
-│   │   └── test_list_flows.py
 │   └── flows/              # Flow tests
-│       ├── test_flow_dummy_2step.py
-│       └── test_flow_hello_world.py
 ├── layer/                   # Lambda layers
 │   └── requirements.txt
 └── serverless.yml          # Infrastructure definition
@@ -94,27 +101,38 @@ serverless deploy
 
 ## Usage
 
-### Listing Available Flows
+### Available Endpoints
 
+The application provides two types of endpoints:
+
+1. Core System Endpoints:
+- `GET /flows` - List available flows
+- `POST /run/{flow_name}` - Execute a flow
+- `GET /run/{flow_name}/{execution_id}` - Get flow execution result
+- `GET /auth/config` - Get Cognito configuration
+- `GET /auth/verify` - Verify authentication token
+
+2. Auto-generated Function Endpoints:
+Each function in `functions/lib/` automatically gets its own endpoint:
+- `POST /lib/hello-world` - Execute hello world function
+- `POST /lib/ping` - Execute ping function
+- `POST /lib/dummy-check` - Execute dummy check function
+
+### Creating a New Function
+
+1. Add a new directory in `functions/lib/`:
 ```bash
-./test/api/test_list_flows.py
+mkdir functions/lib/my-function
 ```
 
-Example output:
-```
-+------------------+---------------------------------+--------+---------------------+
-| Name             | Description                     | States | Created            |
-+==================+=================================+========+=====================+
-| dummy2StepFlow   | A dummy two-step data pipeline | 2      | 2024-12-24T10:00Z  |
-| helloWorldFlow   | A simple hello world workflow   | 1      | 2024-12-24T09:30Z  |
-+------------------+---------------------------------+--------+---------------------+
+2. Create a handler file:
+```python
+# functions/lib/my-function/handler.py
+def handler(event, context):
+    return {"status": "success", "data": event}
 ```
 
-### Running a Flow
-
-```bash
-./test/flows/test_flow_dummy_2step.py --input '{"test": true}'
-```
+The function will be automatically available at `POST /lib/my-function`
 
 ### Creating a New Flow
 
@@ -133,18 +151,11 @@ definition:
 
 functions:
   - name: FirstStepFunction
-    handler: scripts/my_script.handler
+    handler: functions/lib/my-function/handler.handler
     runtime: python3.9
 ```
 
-2. Add your Lambda function in `scripts/`:
-```python
-# scripts/my_script.py
-def handler(event, context):
-    return {"status": "success", "data": event}
-```
-
-3. Deploy the changes:
+2. Deploy the changes:
 ```bash
 serverless deploy
 ```

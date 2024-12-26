@@ -1,3 +1,4 @@
+// deploy/generate-step-functions.js
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
@@ -59,8 +60,8 @@ module.exports = async () => {
     if (flowContent.functions) {
       for (const func of flowContent.functions) {
         const [handlerPath] = func.handler.split('.');
-        const sourceFile = handlerPath.replace('scripts/', '') + '.py';
-        const sourcePath = path.join(__dirname, '..', 'scripts', sourceFile);
+        const sourceFile = handlerPath.replace('functions/lib/', '') + '.py';
+        const sourcePath = path.join(__dirname, '..', 'functions/lib', handlerPath.split('/').pop(), 'handler.py');
         const handlerName = sourceFile.replace('.py', '');
 
         try {
