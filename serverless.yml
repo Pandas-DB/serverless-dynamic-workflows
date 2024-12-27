@@ -87,6 +87,12 @@ provider:
           Action:
             - states:DescribeExecution
           Resource: "arn:aws:states:${self:provider.region}:*:execution:*"
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+          Resource:
+            - arn:aws:ssm:${self:provider.region}:*:parameter/${self:service}/${self:provider.stage}/*
 
 custom:
   flowsDir: flows

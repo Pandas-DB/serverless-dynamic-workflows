@@ -99,6 +99,48 @@ serverless deploy
 ./admin_tools/get_user_token.py --email your@email.com
 ```
 
+## Secrets Management
+
+The application uses AWS Systems Manager Parameter Store for managing secrets securely. To add secrets for third-party API integrations:
+
+1. Store secrets using AWS CLI:
+
+```bash
+# Store an API key
+aws ssm put-parameter \
+    --name "/serverless-dynamic-workflows/${STAGE}/API_KEY" \
+    --type SecureString \
+    --value "your-api-key-here"
+
+# Store an API secret
+aws ssm put-parameter \
+    --name "/serverless-dynamic-workflows/${STAGE}/API_SECRET" \
+    --type SecureString \
+    --value "your-secret-here"
+
+# Replace ${STAGE} with 'dev', 'prod', etc.
+```
+
+2. Or using AWS Console:
+
+- Navigate to AWS Systems Manager > Parameter Store
+- Click "Create parameter"
+- Name: /serverless-dynamic-workflows/${STAGE}/PARAMETER_NAME
+- Type: SecureString
+- Value: Your secret value
+
+3. Access in your functions:
+
+```python
+# functions/lib/my-function/handler.py
+import os
+
+def handler(event, context):
+    api_key = os.environ.get('API_KEY')
+    api_secret = os.environ.get('API_SECRET')
+    # Use these values for your API calls
+```
+
 ## Usage
 
 ### Available Endpoints
