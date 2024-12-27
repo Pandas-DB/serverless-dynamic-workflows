@@ -11,5 +11,5 @@ definition:
 
 functions:
   - name: HelloWorldFunction
-    handler: hello_world.handler
+    handler: functions/lib/hello_world/handler.handler
     runtime: python3.9

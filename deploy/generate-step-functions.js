@@ -2,7 +2,6 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const JSZip = require('jszip');
 
 const cfSchema = yaml.DEFAULT_SCHEMA.extend([
   new yaml.Type('!GetAtt', {
@@ -14,12 +13,6 @@ const cfSchema = yaml.DEFAULT_SCHEMA.extend([
     construct: data => ({ Ref: data })
   })
 ]);
-
-const createZip = async (handlerCode, handlerName) => {
-  const zip = new JSZip();
-  zip.file(`${handlerName}.py`, handlerCode);
-  return zip.generateAsync({ type: 'base64' });
-};
 
 module.exports = async () => {
   const resources = {};
@@ -35,18 +28,33 @@ module.exports = async () => {
           Action: 'sts:AssumeRole'
         }]
       },
-      ManagedPolicyArns: ['arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'],
+      ManagedPolicyArns: [
+        'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
+        'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess'
+      ],
       Policies: [{
         PolicyName: 'StepFunctionsExecutionPolicy',
         PolicyDocument: {
           Version: '2012-10-17',
           Statement: [{
             Effect: 'Allow',
-            Action: ['lambda:InvokeFunction'],
+            Action: [
+              'lambda:InvokeFunction'
+            ],
             Resource: '*'
           }]
         }
       }]
+    }
+  };
+
+  resources.StateMachineLogGroup = {
+    Type: 'AWS::Logs::LogGroup',
+    Properties: {
+      LogGroupName: {
+        'Fn::Sub': '/aws/vendedlogs/states/${self:service}-${self:provider.stage}'
+      },
+      RetentionInDays: 14
     }
   };
 
@@ -57,45 +65,30 @@ module.exports = async () => {
     const flowContent = yaml.load(fs.readFileSync(path.join(flowsDir, file), 'utf8'), { schema: cfSchema });
     if (!flowContent?.name || !flowContent?.definition) continue;
 
-    if (flowContent.functions) {
-      for (const func of flowContent.functions) {
-        const [handlerPath] = func.handler.split('.');
-        const sourceFile = handlerPath.replace('functions/lib/', '') + '.py';
-        const sourcePath = path.join(__dirname, '..', 'functions/lib', handlerPath.split('/').pop(), 'handler.py');
-        const handlerName = sourceFile.replace('.py', '');
-
-        try {
-          const sourceCode = fs.readFileSync(sourcePath, 'utf8');
-          const zipContent = await createZip(sourceCode, handlerName);
-
-          resources[func.name] = {
-            Type: 'AWS::Lambda::Function',
-            Properties: {
-              FunctionName: func.name,
-              Handler: `${handlerName}.handler`,
-              Runtime: func.runtime || 'python3.9',
-              Code: { ZipFile: zipContent },
-              Role: { 'Fn::GetAtt': ['IamRoleLambdaExecution', 'Arn'] }
-            }
-          };
-        } catch (error) {
-          console.error(`Error processing function ${func.name}:`, error);
-          continue;
-        }
-      }
-    }
-
     const variables = {};
     if (flowContent.functions) {
       flowContent.functions.forEach(func => {
-        variables[`${func.name}Arn`] = { 'Fn::GetAtt': [func.name, 'Arn'] };
+        // Extract the function path parts
+        const handlerParts = func.handler.split('/');
+        const functionDir = handlerParts[handlerParts.length - 2]; // get hello_world from the path
+
+        // Replicate the same naming convention from serverless-dynamic-functions.js
+        const normalizedName = functionDir
+          .replace(/-/g, '_')
+          .replace(/[^a-zA-Z0-9_]/g, '')
+          .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+        const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+
+        // Use Serverless's internal function naming convention
+        variables[`${func.name}Arn`] = {
+          'Fn::GetAtt': ['LibHelloWorldLambdaFunction', 'Arn']  // Notice the capitalization
+        };
       });
     }
 
     resources[`${flowContent.name}StateMachine`] = {
       Type: 'AWS::StepFunctions::StateMachine',
-      DependsOn: ['StepFunctionsExecutionRole']
-        .concat(flowContent.functions?.map(f => f.name) || []),
+      DependsOn: ['StepFunctionsExecutionRole', 'StateMachineLogGroup'],
       Properties: {
         StateMachineName: flowContent.name,
         DefinitionString: {
@@ -104,7 +97,18 @@ module.exports = async () => {
             variables
           ]
         },
-        RoleArn: { 'Fn::GetAtt': ['StepFunctionsExecutionRole', 'Arn'] }
+        RoleArn: { 'Fn::GetAtt': ['StepFunctionsExecutionRole', 'Arn'] },
+        LoggingConfiguration: {
+          Level: 'ALL',
+          IncludeExecutionData: true,
+          Destinations: [{
+            CloudWatchLogsLogGroup: {
+              LogGroupArn: {
+                'Fn::Sub': 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/vendedlogs/states/${self:service}-${self:provider.stage}:*'
+              }
+            }
+          }]
+        }
       }
     };
   }

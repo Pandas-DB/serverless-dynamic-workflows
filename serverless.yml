@@ -5,6 +5,10 @@ provider:
   runtime: python3.9
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'eu-west-1'}
+  logRetentionInDays: 14
+  tracing:
+    lambda: true
+    apiGateway: true
 
   environment:
     METADATA_TABLE: ${self:service}-${self:provider.stage}

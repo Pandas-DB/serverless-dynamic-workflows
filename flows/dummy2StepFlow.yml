@@ -2,21 +2,21 @@
 name: dummy2StepFlow
 description: A dummy two-step data processing pipeline
 definition:
-  StartAt: GenerateRandom
+  StartAt: HelloWorld
   States:
-    GenerateRandom:
+    HelloWorld:
       Type: Task
-      Resource: "${RandomGeneratorFunctionArn}"
-      Next: TransformRandom
-    TransformRandom:
+      Resource: "${HelloWorldFunctionArn}"
+      Next: DummyCheck
+    DummyCheck:
       Type: Task
-      Resource: "${TransformRandomFunctionArn}"
+      Resource: "${DummyCheckFunctionArn}"
       End: true
 
 functions:
-  - name: RandomGeneratorFunction
-    handler: hello_world.handler
+  - name: HelloWorldFunction
+    handler: functions/lib/hello_world/handler.handler
     runtime: python3.9
-  - name: TransformRandomFunction
-    handler: dummy_check.handler
+  - name: DummyCheckFunction
+    handler: functions/lib/dummy_check/handler.handler
     runtime: python3.9
