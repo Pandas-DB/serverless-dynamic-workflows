@@ -18,6 +18,7 @@ response = requests.post(
     json={}
 )
 print(response.json())
+assert response.json()['status'] == 'SUCCESS'
 
 
 def get_flow_result(execution_arn, max_wait=300):
@@ -43,3 +44,4 @@ def get_flow_result(execution_arn, max_wait=300):
 execution_arn = response.json()['executionArn']
 result = get_flow_result(execution_arn)
 print(result)
+assert result['status'] == 'SUCCEEDED'
