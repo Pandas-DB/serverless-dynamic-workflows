@@ -17,6 +17,7 @@ const cfSchema = yaml.DEFAULT_SCHEMA.extend([
 module.exports = async () => {
   const resources = {};
 
+  // Step Functions Execution Role
   resources.StepFunctionsExecutionRole = {
     Type: 'AWS::IAM::Role',
     Properties: {
@@ -48,6 +49,33 @@ module.exports = async () => {
     }
   };
 
+  // EventBridge Execution Role
+  resources.EventBridgeExecutionRole = {
+    Type: 'AWS::IAM::Role',
+    Properties: {
+      AssumeRolePolicyDocument: {
+        Version: '2012-10-17',
+        Statement: [{
+          Effect: 'Allow',
+          Principal: { Service: 'events.amazonaws.com' },
+          Action: 'sts:AssumeRole'
+        }]
+      },
+      Policies: [{
+        PolicyName: 'EventBridgeStepFunctionsPolicy',
+        PolicyDocument: {
+          Version: '2012-10-17',
+          Statement: [{
+            Effect: 'Allow',
+            Action: ['states:StartExecution'],
+            Resource: '*'
+          }]
+        }
+      }]
+    }
+  };
+
+  // CloudWatch Logs Group for Step Functions
   resources.StateMachineLogGroup = {
     Type: 'AWS::Logs::LogGroup',
     Properties: {
@@ -70,22 +98,22 @@ module.exports = async () => {
       flowContent.functions.forEach(func => {
         // Extract the function path parts
         const handlerParts = func.handler.split('/');
-        const functionDir = handlerParts[handlerParts.length - 2]; // get hello_world from the path
+        const functionDir = handlerParts[handlerParts.length - 2];
 
-        // Replicate the same naming convention from serverless-dynamic-functions.js
+        // Replicate the same naming convention
         const normalizedName = functionDir
           .replace(/-/g, '_')
           .replace(/[^a-zA-Z0-9_]/g, '')
           .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
         const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
 
-        // Use Serverless's internal function naming convention
         variables[`${func.name}Arn`] = {
-          'Fn::GetAtt': ['LibHelloWorldLambdaFunction', 'Arn']  // Notice the capitalization
+          'Fn::GetAtt': ['LibHelloWorldLambdaFunction', 'Arn']
         };
       });
     }
 
+    // Create State Machine
     resources[`${flowContent.name}StateMachine`] = {
       Type: 'AWS::StepFunctions::StateMachine',
       DependsOn: ['StepFunctionsExecutionRole', 'StateMachineLogGroup'],
@@ -111,6 +139,25 @@ module.exports = async () => {
         }
       }
     };
+
+    // Create EventBridge Rule for scheduled flows
+    if (flowContent.schedule) {
+      resources[`${flowContent.name}ScheduleRule`] = {
+        Type: 'AWS::Events::Rule',
+        Properties: {
+          Name: `${flowContent.name}-schedule`,
+          Description: `Schedule for ${flowContent.name}`,
+          ScheduleExpression: flowContent.schedule,
+          State: 'ENABLED',
+          Targets: [{
+            Id: `${flowContent.name}Target`,
+            Arn: { 'Fn::GetAtt': [`${flowContent.name}StateMachine`, 'Arn'] },
+            RoleArn: { 'Fn::GetAtt': ['EventBridgeExecutionRole', 'Arn'] },
+            Input: flowContent.input ? JSON.stringify(flowContent.input) : '{}'
+          }]
+        }
+      };
+    }
   }
 
   return { Resources: resources };
