@@ -29,31 +29,61 @@
 
 ```
 serverless-dynamic-workflows/
-├── admin_tools/                # Admin utilities
-│   ├── create_user.py         # Create Cognito users
-│   └── get_user_token.py      # Generate authentication tokens
-├── deploy/                    # Deployment scripts
-│   ├── generate_step_functions.js
-│   ├── generate_lib_functions.js
-│   └── load_flows.js
-├── flows/                     # Flow definitions
-│   ├── dummy2StepFlow.yml
-│   └── helloWorldFlow.yml
-├── functions/                 # Lambda functions
-│   ├── base/                 # Core functionality
-│   │   ├── auth/            # Authentication endpoints
-│   │   ├── list_flows/      # List available flows
-│   │   └── run_flow/        # Execute flows
-│   └── lib/                  # Reusable functions
-│       ├── hello_world/     # Each folder becomes an endpoint
-│       ├── ping/
-│       └── dummy_check/
-├── test/                     # Test utilities
-│   ├── api/                 # API tests
-│   └── flows/              # Flow tests
-├── layer/                   # Lambda layers
+├── admin_tools/                  # Admin utilities
+│   ├── create_user.py           # Create Cognito users
+│   └── get_user_token.py        # Generate authentication tokens
+├── deploy/                      # Deployment scripts
+│   ├── generate-step-functions.js
+│   ├── load_flows.js
+│   └── serverless-dynamic-functions.js
+├── flows/                       # Flow definitions
+│   ├── compositeFlow.yml       # Composite flow example
+│   ├── dummy2StepFlow.yml      # Two-step flow example
+│   ├── helloWorldFlow.yml      # Simple flow example
+│   └── scheduleFlow.yml        # Scheduled flow example
+├── functions/                   # Lambda functions
+│   ├── base/                   # Core functionality
+│   │   ├── auth/              # Authentication endpoints
+│   │   │   ├── __init__.py
+│   │   │   └── handler.py
+│   │   ├── get_flow_result/   # Get flow execution results
+│   │   │   ├── __init__.py
+│   │   │   └── handler.py
+│   │   ├── list_flows/        # List available flows
+│   │   │   ├── __init__.py
+│   │   │   └── handler.py
+│   │   └── run_flow/          # Execute flows
+│   │       ├── __init__.py
+│   │       └── handler.py
+│   └── lib/                    # Reusable functions
+│       ├── dummy_check/       # Example function
+│       │   ├── __init__.py
+│       │   └── handler.py
+│       ├── hello_world/       # Example function
+│       │   ├── __init__.py
+│       │   └── handler.py
+│       └── ping/              # Example function
+│           ├── __init__.py
+│           └── handler.py
+├── test/                       # Test utilities
+│   ├── api/                   # API tests
+│   │   └── test_list_flows.py
+│   ├── flows/                # Flow tests
+│   │   ├── test_flow_composite.py
+│   │   ├── test_flow_dummy_2step.py
+│   │   └── test_flow_hello_world.py
+│   └── functions-lib/         # Library function tests
+│       └── test_ping.py
+├── layer/                     # Lambda layers
 │   └── requirements.txt
-└── serverless.yml          # Infrastructure definition
+├── node_modules/              # Node.js dependencies
+├── package.json              # Node.js project configuration
+├── package-lock.json        # Node.js dependencies lock file
+├── README.md               # Project documentation
+├── LICENSE.txt            # License information
+├── AUTHORS.rst           # Authors information
+├── .gitignore           # Git ignore rules
+└── serverless.yml       # Infrastructure definition
 ```
 
 ## Prerequisites
