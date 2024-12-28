@@ -17,7 +17,6 @@ const cfSchema = yaml.DEFAULT_SCHEMA.extend([
 module.exports = async () => {
   const resources = {};
 
-  // Step Functions Execution Role
   resources.StepFunctionsExecutionRole = {
     Type: 'AWS::IAM::Role',
     Properties: {
@@ -40,7 +39,8 @@ module.exports = async () => {
           Statement: [{
             Effect: 'Allow',
             Action: [
-              'lambda:InvokeFunction'
+              'lambda:InvokeFunction',
+              'states:StartExecution'  // Added this permission
             ],
             Resource: '*'
           }]
@@ -49,7 +49,6 @@ module.exports = async () => {
     }
   };
 
-  // EventBridge Execution Role
   resources.EventBridgeExecutionRole = {
     Type: 'AWS::IAM::Role',
     Properties: {
@@ -75,7 +74,6 @@ module.exports = async () => {
     }
   };
 
-  // CloudWatch Logs Group for Step Functions
   resources.StateMachineLogGroup = {
     Type: 'AWS::Logs::LogGroup',
     Properties: {
@@ -94,13 +92,13 @@ module.exports = async () => {
     if (!flowContent?.name || !flowContent?.definition) continue;
 
     const variables = {};
+
+    // Handle function ARNs
     if (flowContent.functions) {
       flowContent.functions.forEach(func => {
-        // Extract the function path parts
         const handlerParts = func.handler.split('/');
         const functionDir = handlerParts[handlerParts.length - 2];
 
-        // Replicate the same naming convention
         const normalizedName = functionDir
           .replace(/-/g, '_')
           .replace(/[^a-zA-Z0-9_]/g, '')
@@ -113,7 +111,15 @@ module.exports = async () => {
       });
     }
 
-    // Create State Machine
+    // Handle state machine references
+    if (flowContent.stateMachineReferences) {
+      flowContent.stateMachineReferences.forEach(stateMachineName => {
+        variables[stateMachineName] = {
+          'Fn::GetAtt': [`${stateMachineName}`, 'Arn']
+        };
+      });
+    }
+
     resources[`${flowContent.name}StateMachine`] = {
       Type: 'AWS::StepFunctions::StateMachine',
       DependsOn: ['StepFunctionsExecutionRole', 'StateMachineLogGroup'],
@@ -140,7 +146,6 @@ module.exports = async () => {
       }
     };
 
-    // Create EventBridge Rule for scheduled flows
     if (flowContent.schedule) {
       resources[`${flowContent.name}ScheduleRule`] = {
         Type: 'AWS::Events::Rule',
