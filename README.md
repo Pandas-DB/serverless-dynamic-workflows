@@ -18,6 +18,8 @@
 - **Single API Entry Point**: Execute any flow through a unified REST API
 - **Cognito Authentication**: Secure API endpoints with JWT tokens
 - **Simple Flow Definitions**: Define workflows in YAML with automatic Lambda creation
+- **Scheduled Flows**: Create flows that run on a schedule using CloudWatch Events
+- **Composite Flows**: Orchestrate multiple flows to run in parallel or sequence
 - **Admin Tools**: Easy user management and token generation
 - **Testing Tools**: Built-in flow testing capabilities
 - **Auto-generated Endpoints**: Each function in lib/ automatically gets its own REST endpoint under the `/lib` prefix
@@ -201,6 +203,90 @@ functions:
 ```bash
 serverless deploy
 ```
+
+### Creating a Scheduled Flow
+
+You can create flows that run on a schedule using CloudWatch Events (EventBridge). Add a `schedule` property to your flow definition:
+
+```yaml
+# flows/scheduledFlow.yml
+name: scheduledFlow
+description: A workflow that runs on a schedule
+schedule: cron(0 12 * * ? *)  # Runs daily at 12 PM UTC
+input:  # Optional static input that will be passed to the flow
+  message: "Scheduled execution"
+definition:
+  StartAt: FirstStep
+  States:
+    FirstStep:
+      Type: Task
+      Resource: "${FirstStepFunctionArn}"
+      End: true
+
+functions:
+  - name: FirstStepFunction
+    handler: functions/lib/my-function/handler.handler
+    runtime: python3.9
+```
+
+Schedule expressions can use either:
+- Cron expressions: `cron(0 12 * * ? *)`  # Runs daily at noon UTC
+- Rate expressions: `rate(5 minutes)`      # Runs every 5 minutes
+
+### Creating a Composite Flow
+
+You can create flows that orchestrate other flows, running them in parallel or sequence. Use the special `arn:aws:states:::states:startExecution` resource to invoke other state machines:
+
+```yaml
+# flows/compositeFlow.yml
+name: compositeFlow
+description: A workflow that combines multiple flows
+definition:
+  StartAt: ParallelFlows
+  States:
+    ParallelFlows:
+      Type: Parallel
+      Branches:
+      - StartAt: Flow1
+        States:
+          Flow1:
+            Type: Task
+            Resource: "arn:aws:states:::states:startExecution"
+            Parameters:
+              StateMachineArn: "${flow1StateMachine}"
+              Input.$: "$"
+            End: true
+      - StartAt: Flow2
+        States:
+          Flow2:
+            Type: Task
+            Resource: "arn:aws:states:::states:startExecution"
+            Parameters:
+              StateMachineArn: "${flow2StateMachine}"
+              Input.$: "$"
+            End: true
+      Next: Flow3
+    Flow3:
+      Type: Task
+      Resource: "arn:aws:states:::states:startExecution"
+      Parameters:
+        StateMachineArn: "${flow3StateMachine}"
+        Input.$: "$"
+      End: true
+
+# Reference the state machines that will be called
+stateMachineReferences:
+  - flow1StateMachine
+  - flow2StateMachine
+  - flow3StateMachine
+```
+
+This example:
+1. Runs flow1 and flow2 in parallel
+2. Waits for both to complete
+3. Then runs flow3 sequentially
+
+The `stateMachineReferences` section is required to properly link to other state machines. Use the exact name of the flow plus "StateMachine" suffix (e.g., "helloWorldFlowStateMachine" for a flow named "helloWorldFlow").
 
 ## API Endpoints
 
