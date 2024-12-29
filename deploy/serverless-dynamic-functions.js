@@ -55,6 +55,7 @@ class ServerlessDynamicFunctions {
         timeout: 29, // Set to 29 to avoid API Gateway 30s timeout warning
         memorySize: 128,
         layers: [{ Ref: 'DependenciesLambdaLayer' }],
+        environment: {API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}"},
         package: {
           patterns: [
             `functions/lib/${dirName}/**`

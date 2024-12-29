@@ -3,6 +3,9 @@ import boto3
 import logging
 from typing import Dict, Any
 
+from functions.base.api_usage.handler import track_usage_middleware
+
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -19,6 +22,7 @@ def get_state_machine_arn(flow_name: str) -> str:
     return f"arn:aws:states:{region}:{account_id}:stateMachine:{flow_name}"
 
 
+@track_usage_middleware
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Handles the API Gateway event to start a Step Function execution.

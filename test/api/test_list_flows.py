@@ -1,5 +1,4 @@
 # tools/flow/list_flows.py
-# !/usr/bin/env python3
 import os
 import json
 import requests

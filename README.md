@@ -318,6 +318,56 @@ This example:
 
 The `stateMachineReferences` section is required to properly link to other state machines. Use the exact name of the flow plus "StateMachine" suffix (e.g., "helloWorldFlowStateMachine" for a flow named "helloWorldFlow").
 
+## API Usage Tracking
+
+The application includes built-in API usage tracking per user and month. This is automatically enabled for core system endpoints and can be added to your custom functions.
+
+### Data Structure
+
+Usage data is stored in DynamoDB with the following structure:
+- `userId`: User's Cognito ID (Hash Key)
+- `yearMonth`: Month of usage in YYYY-MM format (Range Key)
+- `apiCalls`: Total number of API calls for that month
+- `ttl`: Automatic cleanup after 90 days
+
+### Adding Usage Tracking to Custom Functions
+
+1. Import the middleware in your function:
+```python
+# functions/lib/my-function/handler.py
+from functions.base.api_usage.handler import track_usage_middleware
+
+@track_usage_middleware
+def handler(event, context):
+    return {"status": "success", "data": event}
+```
+
+The middleware will automatically:
+- Track API calls per authenticated user
+- Store monthly usage statistics
+- Handle error cases gracefully (won't affect your function if tracking fails)
+
+### Retrieving Usage Data
+
+Usage data can be retrieved using the `/usage/{userId}` endpoint:
+
+```bash
+# Get all usage data for a user
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+     https://your-api.execute-api.region.amazonaws.com/dev/usage/user123
+
+# Get usage for specific months
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+     https://your-api.execute-api.region.amazonaws.com/dev/usage/user123?startDate=2024-01&endDate=2024-12
+```
+
+### Usage Data Retention
+
+- Usage data is automatically cleaned up after 90 days using DynamoDB TTL
+- Data is stored at month granularity for easier billing integration
+- Failed tracking attempts won't affect your function execution
+
+
 ## API Endpoints
 
 - `GET /flows` - List available flows

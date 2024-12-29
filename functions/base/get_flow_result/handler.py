@@ -1,11 +1,13 @@
 import json
 import boto3
 from aws_lambda_powertools import Logger
+from functions.base.api_usage.handler import track_usage_middleware
 
 logger = Logger()
 sfn = boto3.client('stepfunctions')
 
 
+@track_usage_middleware
 @logger.inject_lambda_context
 def handler(event, context):
     execution_id = event['pathParameters']['execution_id']

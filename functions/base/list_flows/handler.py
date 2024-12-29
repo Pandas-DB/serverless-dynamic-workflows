@@ -4,6 +4,8 @@ import logging
 from typing import Dict, Any
 import traceback
 
+from functions.base.api_usage.handler import track_usage_middleware
+
 # Enhanced logging setup
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -17,6 +19,7 @@ logging.basicConfig(
 sfn = boto3.client('stepfunctions')
 
 
+@track_usage_middleware
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Handles the API Gateway event to list all available Step Function workflows.

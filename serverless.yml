@@ -97,6 +97,14 @@ provider:
             - ssm:GetParameters
           Resource:
             - arn:aws:ssm:${self:provider.region}:*:parameter/${self:service}/${self:provider.stage}/*
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-api-usage-${self:provider.stage}
 
 custom:
   flowsDir: flows
@@ -131,6 +139,7 @@ functions:
       COGNITO_USER_POOL_ID: !Ref CognitoUserPool
       COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
       POWERTOOLS_METRICS_NAMESPACE: ${self:service}-auth
+      API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
     events:
       - httpApi:
           path: /auth/config
@@ -147,6 +156,7 @@ functions:
       - {Ref: DependenciesLambdaLayer}
     environment:
       POWERTOOLS_METRICS_NAMESPACE: ${self:service}-auth
+      API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
     events:
       - httpApi:
           path: /auth/verify
@@ -165,6 +175,7 @@ functions:
       - {Ref: DependenciesLambdaLayer}
     environment:
       POWERTOOLS_METRICS_NAMESPACE: ${self:service}-events-producer
+      API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
     events:
       - httpApi:
           path: /run/{flow_name}
@@ -183,6 +194,7 @@ functions:
         - {Ref: DependenciesLambdaLayer}
       environment:
         POWERTOOLS_METRICS_NAMESPACE: ${self:service}-flows
+        API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
       events:
         - httpApi:
             path: /flows
@@ -196,9 +208,20 @@ functions:
     memorySize: 256
     layers:
       - { Ref: DependenciesLambdaLayer }
+    environment:
+      API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
     events:
       - httpApi:
           path: /run/{flow_name}/{execution_id}
+          method: GET
+          authorizer:
+            name: cognitoAuthorizer
+
+  getApiUsage:
+    handler: functions/base/api_usage/handler.get_usage
+    events:
+      - httpApi:
+          path: /usage/{userId}
           method: GET
           authorizer:
             name: cognitoAuthorizer
@@ -216,21 +239,25 @@ layers:
 resources:
   - ${file(./deploy/generate-step-functions.js)}
   - Resources:
-      MetadataTable:
+
+      ApiUsageTable:
         Type: AWS::DynamoDB::Table
         Properties:
-          TableName: ${self:provider.environment.METADATA_TABLE}
+          TableName: ${self:service}-api-usage-${self:provider.stage}
           AttributeDefinitions:
-            - AttributeName: user_id
+            - AttributeName: userId
               AttributeType: S
-            - AttributeName: df_path
+            - AttributeName: yearMonth
               AttributeType: S
           KeySchema:
-            - AttributeName: user_id
+            - AttributeName: userId
               KeyType: HASH
-            - AttributeName: df_path
+            - AttributeName: yearMonth
               KeyType: RANGE
           BillingMode: PAY_PER_REQUEST
+          TimeToLiveSpecification:
+            AttributeName: ttl
+            Enabled: true
 
       CognitoUserPool:
         Type: AWS::Cognito::UserPool
