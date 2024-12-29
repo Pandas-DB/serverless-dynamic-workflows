@@ -349,16 +349,17 @@ The middleware will automatically:
 
 ### Retrieving Usage Data
 
-Usage data can be retrieved using the `/usage/{userId}` endpoint:
+Usage data can be retrieved using the admin tool:
 
 ```bash
-# Get all usage data for a user
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     https://your-api.execute-api.region.amazonaws.com/dev/usage/user123
+# Get usage by email
+./admin_tools/get_user_usage.py --email user@example.com
 
-# Get usage for specific months
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     https://your-api.execute-api.region.amazonaws.com/dev/usage/user123?startDate=2024-01&endDate=2024-12
+# Get usage by user ID
+./admin_tools/get_user_usage.py --user-id abc123
+
+# Get last 3 months of usage
+./admin_tools/get_user_usage.py --email user@example.com --months 3
 ```
 
 ### Usage Data Retention

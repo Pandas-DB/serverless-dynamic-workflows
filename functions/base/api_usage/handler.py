@@ -6,7 +6,6 @@ import time
 from datetime import datetime
 from aws_lambda_powertools import Logger, Metrics
 from aws_lambda_powertools.utilities.typing import LambdaContext
-from boto3.dynamodb.conditions import Key
 
 logger = Logger()
 metrics = Metrics()
@@ -92,45 +91,3 @@ def track_usage_middleware(handler):
         return handler(event, context)
 
     return wrapper
-
-
-@logger.inject_lambda_context
-def get_usage(event: dict, context: LambdaContext) -> dict:
-    """Get API usage for a user"""
-    table = get_table()
-    if not table:
-        return {
-            'statusCode': 503,
-            'body': json.dumps({'error': 'Usage tracking is not configured'})
-        }
-
-    user_id = event['pathParameters']['userId']
-
-    # Optional date filtering
-    start_date = event.get('queryStringParameters', {}).get('startDate')
-    end_date = event.get('queryStringParameters', {}).get('endDate')
-
-    try:
-        # Query usage records for the user
-        query_params = {
-            'KeyConditionExpression': Key('userId').eq(user_id)
-        }
-
-        if start_date and end_date:
-            query_params['KeyConditionExpression'] &= Key('yearMonth').between(start_date, end_date)
-
-        response = table.query(**query_params)
-
-        return {
-            'statusCode': 200,
-            'body': json.dumps({
-                'userId': user_id,
-                'usage': response['Items']
-            })
-        }
-    except Exception as e:
-        logger.error(f"Error getting usage data: {str(e)}")
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }

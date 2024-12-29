@@ -217,15 +217,6 @@ functions:
           authorizer:
             name: cognitoAuthorizer
 
-  getApiUsage:
-    handler: functions/base/api_usage/handler.get_usage
-    events:
-      - httpApi:
-          path: /usage/{userId}
-          method: GET
-          authorizer:
-            name: cognitoAuthorizer
-
 plugins:
   - ./deploy/serverless-dynamic-functions.js
 
