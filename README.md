@@ -63,6 +63,23 @@
 - AWS CLI configured
 - Serverless Framework (`npm install -g serverless`)
 - GitHub personal access token (if using private plugins)
+- Required AWS IAM permissions (see below)
+
+### Required IAM Permissions
+
+The user deploying this framework needs specific AWS permissions. You can create the required IAM policy using the following steps:
+
+1. Create a file named `policy.json` with the required permissions. You can find the complete policy [here](./policy.json).
+
+2. Replace these placeholders in the policy file:
+   - `${region}` with your AWS region (e.g., `us-east-1`)
+   - `${account-id}` with your AWS account ID
+
+3. Create the policy in AWS:
+```bash
+aws iam create-policy \
+    --policy-name serverless-dynamic-workflows-policy \
+    --policy-document file://policy.json
 
 ## Installation
 

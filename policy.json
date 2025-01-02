@@ -1,0 +1,132 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "lambda:CreateFunction",
+                "lambda:UpdateFunctionCode",
+                "lambda:UpdateFunctionConfiguration",
+                "lambda:DeleteFunction",
+                "lambda:GetFunction",
+                "lambda:AddPermission",
+                "lambda:RemovePermission",
+                "lambda:PublishLayerVersion",
+                "lambda:DeleteLayerVersion",
+                "lambda:GetLayerVersion"
+            ],
+            "Resource": "arn:aws:lambda:${region}:${account-id}:*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "apigateway:POST",
+                "apigateway:GET",
+                "apigateway:PUT",
+                "apigateway:DELETE",
+                "apigateway:PATCH"
+            ],
+            "Resource": "arn:aws:apigateway:${region}::/apis/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:DeleteLogGroup",
+                "logs:PutRetentionPolicy",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:${region}:${account-id}:*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:CreateTable",
+                "dynamodb:DeleteTable",
+                "dynamodb:UpdateTable",
+                "dynamodb:DescribeTable"
+            ],
+            "Resource": [
+                "arn:aws:dynamodb:${region}:${account-id}:table/serverless-dynamic-workflows-*",
+                "arn:aws:dynamodb:${region}:${account-id}:table/serverless-dynamic-workflows-api-usage-*",
+                "arn:aws:dynamodb:${region}:${account-id}:table/serverless-dynamic-workflows-events-lock-*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cognito-idp:CreateUserPool",
+                "cognito-idp:DeleteUserPool",
+                "cognito-idp:CreateUserPoolClient",
+                "cognito-idp:DeleteUserPoolClient",
+                "cognito-idp:UpdateUserPool",
+                "cognito-idp:UpdateUserPoolClient",
+                "cognito-idp:DescribeUserPool",
+                "cognito-idp:DescribeUserPoolClient"
+            ],
+            "Resource": "arn:aws:cognito-idp:${region}:${account-id}:userpool/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:PutRolePolicy",
+                "iam:DeleteRolePolicy",
+                "iam:PassRole"
+            ],
+            "Resource": "arn:aws:iam::${account-id}:role/serverless-dynamic-workflows-*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "states:CreateStateMachine",
+                "states:DeleteStateMachine",
+                "states:UpdateStateMachine",
+                "states:DescribeStateMachine",
+                "states:TagResource"
+            ],
+            "Resource": "arn:aws:states:${region}:${account-id}:stateMachine:*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:PutParameter",
+                "ssm:DeleteParameter",
+                "ssm:GetParameter"
+            ],
+            "Resource": "arn:aws:ssm:${region}:${account-id}:parameter/serverless-dynamic-workflows/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:CreateBucket",
+                "s3:DeleteBucket",
+                "s3:ListBucket",
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:DeleteObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::events-*",
+                "arn:aws:s3:::events-*/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cloudformation:CreateStack",
+                "cloudformation:UpdateStack",
+                "cloudformation:DeleteStack",
+                "cloudformation:DescribeStacks",
+                "cloudformation:ListStackResources",
+                "cloudformation:DescribeStackEvents",
+                "cloudformation:GetTemplateSummary",
+                "cloudformation:ValidateTemplate"
+            ],
+            "Resource": "arn:aws:cloudformation:${region}:${account-id}:stack/serverless-dynamic-workflows-*/*"
+        }
+    ]
+}
