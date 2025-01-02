@@ -80,6 +80,7 @@ The user deploying this framework needs specific AWS permissions. You can create
 aws iam create-policy \
     --policy-name serverless-dynamic-workflows-policy \
     --policy-document file://policy.json
+```
 
 ## Installation
 
