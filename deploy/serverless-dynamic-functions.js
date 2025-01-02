@@ -18,9 +18,18 @@ class ServerlessDynamicFunctions {
       .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
   }
 
-  addDynamicFunctions() {
-    const libDir = path.join(this.serverless.config.servicePath, 'functions', 'lib');
+  // New helper function to ensure name is within 64-char limit
+  truncateName(fullName) {
+    if (fullName.length <= 64) return fullName;
 
+    // Take first 30 chars and last 30 chars with a 4-char hash in between
+    const hash = Math.random().toString(36).substr(2, 4);
+    return `${fullName.slice(0, 30)}${hash}${fullName.slice(-30)}`;
+  }
+
+  addDynamicFunctions() {
+    // First handle local functions
+    const libDir = path.join(this.serverless.config.servicePath, 'functions', 'lib');
     this.serverless.cli.log(`Scanning for functions in: ${libDir}`);
 
     if (!fs.existsSync(libDir)) {
@@ -35,24 +44,24 @@ class ServerlessDynamicFunctions {
 
     directories.forEach(dir => {
       const dirName = dir.name;
-      // Normalize the function name for CloudFormation compatibility
       const normalizedName = this.normalizeFunctionName(dirName);
       const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
 
       this.serverless.cli.log(`Adding function: ${functionName} with path /lib/${dirName}`);
 
-      // Verify handler file exists
       const handlerPath = path.join(libDir, dirName, 'handler.py');
       if (!fs.existsSync(handlerPath)) {
         this.serverless.cli.log(`Warning: handler.py not found for ${dirName}`);
         return;
       }
 
-      // Define the function with proper naming
+      const fullName = `${this.serverless.service.service}-${this.serverless.service.provider.stage}-${functionName}`;
+      const truncatedName = this.truncateName(fullName);
+
       this.serverless.service.functions[functionName] = {
-        name: `${this.serverless.service.service}-${this.serverless.service.provider.stage}-${functionName}`,
+        name: truncatedName,
         handler: `functions/lib/${dirName}/handler.handler`,
-        timeout: 29, // Set to 29 to avoid API Gateway 30s timeout warning
+        timeout: 29,
         memorySize: 128,
         layers: [{ Ref: 'DependenciesLambdaLayer' }],
         environment: {API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}"},
@@ -73,7 +82,43 @@ class ServerlessDynamicFunctions {
       };
     });
 
-    // Log the final function count
+    // Then handle plugin functions
+    const plugins = this.serverless.service.custom?.plugins?.packages || [];
+    plugins.forEach(pluginPath => {
+      try {
+        let modulePath = pluginPath;
+        if (pluginPath.startsWith('git+')) {
+          const repoName = pluginPath.split('/').pop().replace('.git', '');
+          modulePath = path.join(process.cwd(), '.plugins', repoName);
+
+          // Clone if not exists
+          if (!fs.existsSync(modulePath)) {
+            const { execSync } = require('child_process');
+            const gitUrl = pluginPath.replace('git+', '');
+            fs.mkdirSync(path.join(process.cwd(), '.plugins'), { recursive: true });
+            execSync(`git clone ${gitUrl} ${modulePath}`);
+          }
+        }
+
+        const pluginModule = require(modulePath);
+        if (typeof pluginModule.getFunctions === 'function') {
+          const pluginFunctions = pluginModule.getFunctions();
+          Object.entries(pluginFunctions).forEach(([name, config]) => {
+            const functionName = `private${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+            const fullName = `${this.serverless.service.service}-${this.serverless.service.provider.stage}-${functionName}`;
+            const truncatedName = this.truncateName(fullName);
+
+            this.serverless.service.functions[functionName] = {
+              ...config,
+              name: truncatedName
+            };
+          });
+        }
+      } catch (error) {
+        this.serverless.cli.log(`Warning: Failed to load plugin ${pluginPath}: ${error.message}`);
+      }
+    });
+
     this.serverless.cli.log(`Total functions added: ${Object.keys(this.serverless.service.functions).length}`);
   }
 }

@@ -108,7 +108,9 @@ provider:
 
 custom:
   flowsDir: flows
-  flows: ${file(./deploy/load_flows.js)}
+  plugins:
+    packages: ${file(./config.json):plugins, []}
+  flows: ${file(./deploy/load_flows.js)}  # Keep using original file
 
 package:
   individually: true
