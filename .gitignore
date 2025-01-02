@@ -21,6 +21,8 @@ __pycache__/*
 .settings
 .idea
 .vscode
+.serverless
+.plugins
 tags
 
 # Package files
@@ -46,6 +48,8 @@ docs/api/*
 docs/_rst/*
 docs/_build/*
 cover/*
+node_modules/*
+layer/python/*
 MANIFEST
 
 # Per-project virtualenvs
@@ -53,3 +57,5 @@ MANIFEST
 .conda*/
 .python-version
 
+# Security reasons
+config.json
