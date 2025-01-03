@@ -5,7 +5,6 @@ import json
 import subprocess
 from pathlib import Path
 
-
 def create_plugin_structure(target_dir: str = 'private-workflows'):
     target_dir = Path(target_dir)
 
@@ -130,6 +129,9 @@ def test_handler():
     # Create example test
     (target_dir / 'tests/functions-lib/test_example_function.py').write_text(example_test_content)
 
+    # Create an empty requirements.txt file
+    (target_dir / 'requirements.txt').write_text('')
+
     # Initialize git repo
     subprocess.run(['git', 'init'], cwd=target_dir)
 
@@ -150,7 +152,6 @@ Next steps:
      ]
    }}
 ''')
-
 
 if __name__ == '__main__':
     print('Get sure you allow it to create folders in your system "chmod +x scripts/create-private-plugin.py"')
