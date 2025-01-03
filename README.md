@@ -20,6 +20,7 @@
 - [Advanced Features](#advanced-features)
   - [Scheduled Workflows](#scheduled-workflows)
   - [Composite Workflows](#composite-workflows)
+  - [Long-Running Tasks (Over 30 Seconds)](#long-running-tasks-over-30-seconds)
   - [Secrets Management](#secrets-management)
   - [API Usage Tracking](#api-usage-tracking)
     - [Data Structure](#data-structure)
@@ -41,6 +42,7 @@
 - **Single API Entry Point**: Execute any function through a unified REST API
 
 ### Workflow Capabilities
+- **Beyond Timeout Endpoints**: Execute Python scripts exceeding 30s (http timeout) using flows and polling for the result
 - **Dynamic Flow Discovery**: Flows defined in YAML files are automatically deployed as AWS Step Functions
 - **Scheduled Executions**: Create flows that run on a schedule using CloudWatch Events
 - **Composite Flows**: Orchestrate multiple flows to run in parallel or sequence
@@ -255,6 +257,13 @@ definition:
 stateMachineReferences:
   - flow1StateMachine
 ```
+
+### Long-Running Tasks (Over 30 Seconds)
+
+API Gateway enforces a 29-second timeout for synchronous calls. To handle tasks that run longer (up to 15 minutes):
+
+1. **Start Flow (POST):** Immediately triggers a Step Functions execution and returns an `executionArn`.  
+2. **Poll Status (GET):** The client uses the `executionArn` to poll for final status (`RUNNING`, `SUCCEEDED`, or `FAILED`).
 
 ### Secrets Management
 
