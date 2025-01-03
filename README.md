@@ -27,6 +27,7 @@
     - [Adding Usage Tracking to Custom Functions](#adding-usage-tracking-to-custom-functions)
     - [Retrieving Usage Data](#retrieving-usage-data)
     - [Usage Data Retention](#usage-data-retention)
+  - [Lambda Permissions Management](#lambda-permissions-management)
 - [API Reference](#api-reference)
 - [Testing](#testing)
 - [Cleanup](#cleanup)
@@ -320,6 +321,30 @@ def handler(event, context):
 - 90-day retention via DynamoDB TTL
 - Monthly granularity for billing
 - Fault-tolerant tracking
+
+### Lambda Permissions Management
+
+To grant your Python functions access to AWS services, add the required permissions to `lambda-permissions.yml`:
+
+```yaml
+# lambda-permissions.yml
+iamRoleStatements:
+  - Effect: Allow
+    Action:
+      - s3:PutObject
+      - s3:GetObject
+    Resource:
+      - "arn:aws:s3:::events-*"
+      - "arn:aws:s3:::events-*/*"
+  # Add new permissions here
+```
+
+After adding new permissions, deploy your changes:
+```bash
+serverless deploy
+```
+
+Your functions will automatically have access to the specified AWS services after deployment.
 
 ## API Reference
 
