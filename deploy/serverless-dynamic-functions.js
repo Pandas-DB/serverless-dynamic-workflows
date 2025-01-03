@@ -1,13 +1,71 @@
 // deploy/serverless-dynamic-functions.js
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 class ServerlessDynamicFunctions {
   constructor(serverless) {
     this.serverless = serverless;
     this.hooks = {
-      'before:package:initialize': this.addDynamicFunctions.bind(this)
+      'before:package:initialize': async () => {
+        await this.mergePluginRequirements();
+        this.addDynamicFunctions();
+      }
     };
+  }
+
+  mergePluginRequirements() {
+    const mainReqPath = path.join(this.serverless.config.servicePath, 'layer', 'requirements.txt');
+    let requirements = new Map();
+
+    // Read main requirements if exists
+    if (fs.existsSync(mainReqPath)) {
+      const content = fs.readFileSync(mainReqPath, 'utf-8');
+      content.split('\n').forEach(line => {
+        line = line.trim();
+        if (!line || line.startsWith('#')) return;
+        const [name] = line.split(/[=<>]/);
+        requirements.set(name.trim().toLowerCase(), line);
+      });
+    }
+
+    // Process plugin requirements
+    const plugins = this.serverless.service.custom?.plugins?.packages || [];
+    plugins.forEach(pluginPath => {
+      if (pluginPath.startsWith('git+')) {
+        const repoName = pluginPath.split('/').pop().replace('.git', '');
+        const modulePath = path.join(process.cwd(), '.plugins', repoName);
+        const pluginReqPath = path.join(modulePath, 'requirements.txt');
+
+        if (fs.existsSync(pluginReqPath)) {
+          const content = fs.readFileSync(pluginReqPath, 'utf-8');
+          content.split('\n').forEach(line => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
+            const [name] = line.split(/[=<>]/);
+            requirements.set(name.trim().toLowerCase(), line);
+          });
+        }
+      }
+    });
+
+    // Write merged requirements back to file
+    const mergedContent = Array.from(requirements.values()).join('\n');
+    fs.writeFileSync(mainReqPath, mergedContent);
+
+    // Rebuild layer
+    const layerPath = path.join(this.serverless.config.servicePath, 'layer');
+    const pythonPath = path.join(layerPath, 'python', 'lib', 'python3.9', 'site-packages');
+    fs.mkdirSync(pythonPath, { recursive: true });
+
+    try {
+      execSync(`pip install -r ${mainReqPath} -t ${pythonPath}`, {
+        stdio: 'inherit'
+      });
+      this.serverless.cli.log('Successfully merged and installed requirements');
+    } catch (error) {
+      this.serverless.cli.log(`Warning: Failed to install requirements: ${error.message}`);
+    }
   }
 
   normalizeFunctionName(name) {
@@ -18,17 +76,14 @@ class ServerlessDynamicFunctions {
       .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
   }
 
-  // New helper function to ensure name is within 64-char limit
   truncateName(fullName) {
     if (fullName.length <= 64) return fullName;
-
-    // Take first 30 chars and last 30 chars with a 4-char hash in between
     const hash = Math.random().toString(36).substr(2, 4);
     return `${fullName.slice(0, 30)}${hash}${fullName.slice(-30)}`;
   }
 
   addDynamicFunctions() {
-    // First handle local functions
+    // First handle local functions - KEEP THIS EXACTLY AS IS
     const libDir = path.join(this.serverless.config.servicePath, 'functions', 'lib');
     this.serverless.cli.log(`Scanning for functions in: ${libDir}`);
 
@@ -87,16 +142,33 @@ class ServerlessDynamicFunctions {
     plugins.forEach(pluginPath => {
       try {
         let modulePath = pluginPath;
+        let repoName = '';
+
         if (pluginPath.startsWith('git+')) {
-          const repoName = pluginPath.split('/').pop().replace('.git', '');
+          repoName = pluginPath.split('/').pop().replace('.git', '');
           modulePath = path.join(process.cwd(), '.plugins', repoName);
 
           // Clone if not exists
-          if (!fs.existsSync(modulePath)) {
-            const { execSync } = require('child_process');
-            const gitUrl = pluginPath.replace('git+', '');
-            fs.mkdirSync(path.join(process.cwd(), '.plugins'), { recursive: true });
-            execSync(`git clone ${gitUrl} ${modulePath}`);
+          const gitUrl = pluginPath.replace('git+', '');
+          fs.mkdirSync(path.join(process.cwd(), '.plugins'), { recursive: true });
+          if (fs.existsSync(modulePath)) {
+            fs.rmSync(modulePath, { recursive: true });
+          }
+          execSync(`git clone ${gitUrl} ${modulePath}`);
+
+          // Create __init__.py files in plugin's functions directory
+          const pluginFunctionsDir = path.join(modulePath, 'functions');
+          const pluginLibDir = path.join(pluginFunctionsDir, 'lib');
+
+          if (fs.existsSync(pluginFunctionsDir)) {
+            if (!fs.existsSync(path.join(pluginFunctionsDir, '__init__.py'))) {
+              fs.writeFileSync(path.join(pluginFunctionsDir, '__init__.py'), '');
+            }
+            if (fs.existsSync(pluginLibDir)) {
+              if (!fs.existsSync(path.join(pluginLibDir, '__init__.py'))) {
+                fs.writeFileSync(path.join(pluginLibDir, '__init__.py'), '');
+              }
+            }
           }
         }
 
@@ -110,7 +182,20 @@ class ServerlessDynamicFunctions {
 
             this.serverless.service.functions[functionName] = {
               ...config,
-              name: truncatedName
+              name: truncatedName,
+              layers: [{ Ref: 'DependenciesLambdaLayer' }],
+              environment: {
+                ...(config.environment || {}),
+                PYTHONPATH: `/opt/python/lib/python3.9/site-packages:/var/task/.plugins/${repoName}`,
+                API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}"
+              },
+              package: {
+                patterns: [
+                  ...(config.package?.patterns || []),
+                  `.plugins/${repoName}/functions/**/*.py`,
+                  `.plugins/${repoName}/functions/**/__init__.py`
+                ]
+              }
             };
           });
         }
