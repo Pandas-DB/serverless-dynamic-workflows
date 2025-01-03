@@ -15,6 +15,7 @@ provider:
     POWERTOOLS_SERVICE_NAME: ${self:service}
     LOG_LEVEL: INFO
     DEPLOYMENT_REGION: ${self:provider.region}
+    PYTHONPATH: /opt/python/lib/python3.9/site-packages:/var/task
 
   httpApi:
     cors: true
@@ -149,6 +150,7 @@ functions:
 
 plugins:
   - ./deploy/serverless-dynamic-functions.js
+  - ./deploy/setup-layer.js
 
 layers:
   dependencies:

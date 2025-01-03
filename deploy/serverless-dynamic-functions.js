@@ -8,10 +8,48 @@ class ServerlessDynamicFunctions {
     this.serverless = serverless;
     this.hooks = {
       'before:package:initialize': async () => {
+        await this.downloadPlugins();
         await this.mergePluginRequirements();
         this.addDynamicFunctions();
       }
     };
+  }
+
+  async downloadPlugins() {
+    const plugins = this.serverless.service.custom?.plugins?.packages || [];
+    for (const pluginPath of plugins) {
+      if (pluginPath.startsWith('git+')) {
+        const repoName = pluginPath.split('/').pop().replace('.git', '');
+        const modulePath = path.join(process.cwd(), '.plugins', repoName);
+
+        // Create plugins directory if it doesn't exist
+        fs.mkdirSync(path.join(process.cwd(), '.plugins'), { recursive: true });
+
+        // Remove existing plugin directory if it exists
+        if (fs.existsSync(modulePath)) {
+          fs.rmSync(modulePath, { recursive: true });
+        }
+
+        // Clone the plugin
+        const gitUrl = pluginPath.replace('git+', '');
+        execSync(`git clone ${gitUrl} ${modulePath}`);
+
+        // Create __init__.py files in plugin's functions directory
+        const pluginFunctionsDir = path.join(modulePath, 'functions');
+        const pluginLibDir = path.join(pluginFunctionsDir, 'lib');
+
+        if (fs.existsSync(pluginFunctionsDir)) {
+          if (!fs.existsSync(path.join(pluginFunctionsDir, '__init__.py'))) {
+            fs.writeFileSync(path.join(pluginFunctionsDir, '__init__.py'), '');
+          }
+          if (fs.existsSync(pluginLibDir)) {
+            if (!fs.existsSync(path.join(pluginLibDir, '__init__.py'))) {
+              fs.writeFileSync(path.join(pluginLibDir, '__init__.py'), '');
+            }
+          }
+        }
+      }
+    }
   }
 
   mergePluginRequirements() {
@@ -59,9 +97,24 @@ class ServerlessDynamicFunctions {
     fs.mkdirSync(pythonPath, { recursive: true });
 
     try {
+      // First, install pyarrow with minimal dependencies
+      if (Array.from(requirements.values()).some(line => line.includes('pyarrow'))) {
+        execSync(`pip install --no-deps pyarrow -t ${pythonPath}`, {
+          stdio: 'inherit'
+        });
+        // Remove pyarrow from requirements to avoid duplicate installation
+        requirements.delete('pyarrow');
+      }
+
+      // Write remaining requirements back to file
+      const remainingContent = Array.from(requirements.values()).join('\n');
+      fs.writeFileSync(mainReqPath, remainingContent);
+
+      // Install remaining requirements
       execSync(`pip install -r ${mainReqPath} -t ${pythonPath}`, {
         stdio: 'inherit'
       });
+
       this.serverless.cli.log('Successfully merged and installed requirements');
     } catch (error) {
       this.serverless.cli.log(`Warning: Failed to install requirements: ${error.message}`);
@@ -147,29 +200,6 @@ class ServerlessDynamicFunctions {
         if (pluginPath.startsWith('git+')) {
           repoName = pluginPath.split('/').pop().replace('.git', '');
           modulePath = path.join(process.cwd(), '.plugins', repoName);
-
-          // Clone if not exists
-          const gitUrl = pluginPath.replace('git+', '');
-          fs.mkdirSync(path.join(process.cwd(), '.plugins'), { recursive: true });
-          if (fs.existsSync(modulePath)) {
-            fs.rmSync(modulePath, { recursive: true });
-          }
-          execSync(`git clone ${gitUrl} ${modulePath}`);
-
-          // Create __init__.py files in plugin's functions directory
-          const pluginFunctionsDir = path.join(modulePath, 'functions');
-          const pluginLibDir = path.join(pluginFunctionsDir, 'lib');
-
-          if (fs.existsSync(pluginFunctionsDir)) {
-            if (!fs.existsSync(path.join(pluginFunctionsDir, '__init__.py'))) {
-              fs.writeFileSync(path.join(pluginFunctionsDir, '__init__.py'), '');
-            }
-            if (fs.existsSync(pluginLibDir)) {
-              if (!fs.existsSync(path.join(pluginLibDir, '__init__.py'))) {
-                fs.writeFileSync(path.join(pluginLibDir, '__init__.py'), '');
-              }
-            }
-          }
         }
 
         const pluginModule = require(modulePath);
