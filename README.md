@@ -181,6 +181,7 @@ my-private-plugin/
 │   └── functions-lib/ # Tests for private functions
 ├── index.js           # Plugin entry point
 └── package.json
+└── requirements.txt  # MUST: add all required Python modules for your functions to work
 ```
 
 3. Push to private repository:
