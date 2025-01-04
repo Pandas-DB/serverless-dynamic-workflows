@@ -165,5 +165,97 @@ module.exports = async () => {
     }
   }
 
+  const pluginsDir = path.join(process.cwd(), '.plugins');
+  if (fs.existsSync(pluginsDir)) {
+    const pluginDirs = fs.readdirSync(pluginsDir, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+
+    for (const pluginDir of pluginDirs) {
+      const pluginFlowsDir = path.join(pluginsDir, pluginDir, 'flows');
+
+      if (fs.existsSync(pluginFlowsDir)) {
+        const pluginFlowFiles = fs.readdirSync(pluginFlowsDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+        for (const file of pluginFlowFiles) {
+          const flowContent = yaml.load(fs.readFileSync(path.join(pluginFlowsDir, file), 'utf8'), { schema: cfSchema });
+          if (!flowContent?.name || !flowContent?.definition) continue;
+
+          const variables = {};
+
+          // Handle function ARNs for plugin flows
+          if (flowContent.functions) {
+          flowContent.functions.forEach(func => {
+            const handlerParts = func.handler.split('/');
+            const functionDir = handlerParts[handlerParts.length - 2];
+
+            const normalizedName = functionDir
+              .replace(/-/g, '_')
+              .replace(/[^a-zA-Z0-9_]/g, '')
+              .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+            const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+
+            variables[`${func.name}Arn`] = {
+              'Fn::GetAtt': ['LibHelloWorldLambdaFunction', 'Arn']
+            };
+          });
+        }
+
+          // Handle state machine references
+          if (flowContent.stateMachineReferences) {
+            flowContent.stateMachineReferences.forEach(stateMachineName => {
+              variables[stateMachineName] = {
+                'Fn::GetAtt': [`${stateMachineName}`, 'Arn']
+              };
+            });
+          }
+
+          resources[`${flowContent.name}StateMachine`] = {
+            Type: 'AWS::StepFunctions::StateMachine',
+            DependsOn: ['StepFunctionsExecutionRole', 'StateMachineLogGroup'],
+            Properties: {
+              StateMachineName: flowContent.name,
+              DefinitionString: {
+                'Fn::Sub': [
+                  JSON.stringify(flowContent.definition),
+                  variables
+                ]
+              },
+              RoleArn: { 'Fn::GetAtt': ['StepFunctionsExecutionRole', 'Arn'] },
+              LoggingConfiguration: {
+                Level: 'ALL',
+                IncludeExecutionData: true,
+                Destinations: [{
+                  CloudWatchLogsLogGroup: {
+                    LogGroupArn: {
+                      'Fn::Sub': 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/vendedlogs/states/${self:service}-${self:provider.stage}:*'
+                    }
+                  }
+                }]
+              }
+            }
+          };
+
+          if (flowContent.schedule) {
+            resources[`${flowContent.name}ScheduleRule`] = {
+              Type: 'AWS::Events::Rule',
+              Properties: {
+                Name: `${flowContent.name}-schedule`,
+                Description: `Schedule for ${flowContent.name}`,
+                ScheduleExpression: flowContent.schedule,
+                State: 'ENABLED',
+                Targets: [{
+                  Id: `${flowContent.name}Target`,
+                  Arn: { 'Fn::GetAtt': [`${flowContent.name}StateMachine`, 'Arn'] },
+                  RoleArn: { 'Fn::GetAtt': ['EventBridgeExecutionRole', 'Arn'] },
+                  Input: flowContent.input ? JSON.stringify(flowContent.input) : '{}'
+                }]
+              }
+            };
+          }
+        }
+      }
+    }
+  }
+
   return { Resources: resources };
 };
