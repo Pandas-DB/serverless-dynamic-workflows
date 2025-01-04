@@ -11,7 +11,6 @@ provider:
     apiGateway: true
 
   environment:
-    CHUNK_SIZE: 100000
     POWERTOOLS_SERVICE_NAME: ${self:service}
     LOG_LEVEL: INFO
     DEPLOYMENT_REGION: ${self:provider.region}
