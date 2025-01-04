@@ -197,6 +197,13 @@ resources:
             - ALLOW_REFRESH_TOKEN_AUTH
             - ALLOW_USER_SRP_AUTH
           PreventUserExistenceErrors: ENABLED
+          RefreshTokenValidity: 1
+          AccessTokenValidity: 1
+          IdTokenValidity: 1
+          TokenValidityUnits:
+            RefreshToken: "days"
+            AccessToken: "hours"
+            IdToken: "hours"
 
     Outputs:
           UserPoolId:
