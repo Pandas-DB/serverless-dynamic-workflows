@@ -1,5 +1,4 @@
 // deploy/setup-layer.js
-
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -86,6 +85,20 @@ cd ../../..
     const mainReqPath = path.join(this.serverless.config.servicePath, 'layer', 'requirements.txt');
     let requirements = new Map();
 
+    // First read existing requirements if they exist
+    if (fs.existsSync(mainReqPath)) {
+      const content = fs.readFileSync(mainReqPath, 'utf-8');
+      content.split('\n').forEach(line => {
+        line = line.trim();
+        if (!line || line.startsWith('#')) return;
+        const [name] = line.split(/[=<>]/);
+        requirements.set(name.trim().toLowerCase(), line);
+      });
+    }
+
+    // Store original requirements before plugin processing
+    const originalRequirements = new Map(requirements);
+
     // Process plugin requirements
     const plugins = this.serverless.service.custom?.plugins?.packages || [];
     for (const pluginPath of plugins) {
@@ -100,11 +113,19 @@ cd ../../..
             line = line.trim();
             if (!line || line.startsWith('#')) return;
             const [name] = line.split(/[=<>]/);
+            // Plugin requirements override existing ones
             requirements.set(name.trim().toLowerCase(), line);
           });
         }
       }
     }
+
+    // Restore non-conflicting original requirements
+    originalRequirements.forEach((line, name) => {
+      if (!requirements.has(name)) {
+        requirements.set(name, line);
+      }
+    });
 
     // Write merged requirements
     const mergedContent = Array.from(requirements.values()).join('\n');
