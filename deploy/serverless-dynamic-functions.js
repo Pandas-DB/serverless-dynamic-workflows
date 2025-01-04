@@ -136,7 +136,10 @@ class ServerlessDynamicFunctions {
         if (typeof pluginModule.getFunctions === 'function') {
           const pluginFunctions = pluginModule.getFunctions();
           Object.entries(pluginFunctions).forEach(([name, config]) => {
-            const functionName = `private${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+            // Use the same normalization as public functions
+            const nameWithoutLib = name.replace(/^lib/, '');
+            const normalizedName = this.normalizeFunctionName(nameWithoutLib);
+            const functionName = `privateLib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
             const fullName = `${this.serverless.service.service}-${this.serverless.service.provider.stage}-${functionName}`;
             const truncatedName = this.truncateName(fullName);
 
