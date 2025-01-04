@@ -147,6 +147,22 @@ functions:
           authorizer:
             name: cognitoAuthorizer
 
+  listRuns:
+    handler: functions/base/list_runs/handler.handler
+    timeout: 30
+    memorySize: 256
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+    environment:
+      POWERTOOLS_METRICS_NAMESPACE: ${self:service}-executions
+      API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
+    events:
+      - httpApi:
+          path: /runs
+          method: GET
+          authorizer:
+            name: cognitoAuthorizer
+
 plugins:
   - ./deploy/serverless-dynamic-functions.js
   - ./deploy/setup-layer.js

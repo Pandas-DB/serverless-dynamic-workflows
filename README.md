@@ -264,8 +264,18 @@ stateMachineReferences:
 
 API Gateway enforces a 29-second timeout for synchronous calls. To handle tasks that run longer (up to 15 minutes):
 
+### Long-Running Tasks (Over 30 Seconds)
+
+API Gateway enforces a 29-second timeout for synchronous calls. To handle tasks that run longer (up to 15 minutes):
+
 1. **Start Flow (POST):** Immediately triggers a Step Functions execution and returns an `executionArn`.  
 2. **Poll Status (GET):** The client uses the `executionArn` to poll for final status (`RUNNING`, `SUCCEEDED`, or `FAILED`).
+3. **List Executions (GET):** View all executions and their statuses using the `/runs` endpoint, which returns:
+   - Flow name
+   - Execution status
+   - Start and stop times
+   - Execution ID
+   - Total execution count
 
 ### Secrets Management
 
@@ -353,6 +363,7 @@ Core Endpoints:
 - `GET /flows` - List available flows
 - `POST /run/{flow_name}` - Execute a flow
 - `GET /run/{flow_name}/{execution_id}` - Get execution result
+- `GET /runs` - List all the flows executions (`/run`) for the authenticated user in the last 90 days
 - `GET /auth/config` - Get Cognito configuration
 - `GET /auth/verify` - Verify token
 
