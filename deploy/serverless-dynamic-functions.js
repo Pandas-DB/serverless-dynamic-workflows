@@ -9,7 +9,6 @@ class ServerlessDynamicFunctions {
     this.hooks = {
       'before:package:initialize': async () => {
         await this.downloadPlugins();
-        await this.mergePluginRequirements();
         this.addDynamicFunctions();
       }
     };
@@ -49,75 +48,6 @@ class ServerlessDynamicFunctions {
           }
         }
       }
-    }
-  }
-
-  mergePluginRequirements() {
-    const mainReqPath = path.join(this.serverless.config.servicePath, 'layer', 'requirements.txt');
-    let requirements = new Map();
-
-    // Read main requirements if exists
-    if (fs.existsSync(mainReqPath)) {
-      const content = fs.readFileSync(mainReqPath, 'utf-8');
-      content.split('\n').forEach(line => {
-        line = line.trim();
-        if (!line || line.startsWith('#')) return;
-        const [name] = line.split(/[=<>]/);
-        requirements.set(name.trim().toLowerCase(), line);
-      });
-    }
-
-    // Process plugin requirements
-    const plugins = this.serverless.service.custom?.plugins?.packages || [];
-    plugins.forEach(pluginPath => {
-      if (pluginPath.startsWith('git+')) {
-        const repoName = pluginPath.split('/').pop().replace('.git', '');
-        const modulePath = path.join(process.cwd(), '.plugins', repoName);
-        const pluginReqPath = path.join(modulePath, 'requirements.txt');
-
-        if (fs.existsSync(pluginReqPath)) {
-          const content = fs.readFileSync(pluginReqPath, 'utf-8');
-          content.split('\n').forEach(line => {
-            line = line.trim();
-            if (!line || line.startsWith('#')) return;
-            const [name] = line.split(/[=<>]/);
-            requirements.set(name.trim().toLowerCase(), line);
-          });
-        }
-      }
-    });
-
-    // Write merged requirements back to file
-    const mergedContent = Array.from(requirements.values()).join('\n');
-    fs.writeFileSync(mainReqPath, mergedContent);
-
-    // Rebuild layer
-    const layerPath = path.join(this.serverless.config.servicePath, 'layer');
-    const pythonPath = path.join(layerPath, 'python', 'lib', 'python3.9', 'site-packages');
-    fs.mkdirSync(pythonPath, { recursive: true });
-
-    try {
-      // First, install pyarrow with minimal dependencies
-      if (Array.from(requirements.values()).some(line => line.includes('pyarrow'))) {
-        execSync(`pip install --no-deps pyarrow -t ${pythonPath}`, {
-          stdio: 'inherit'
-        });
-        // Remove pyarrow from requirements to avoid duplicate installation
-        requirements.delete('pyarrow');
-      }
-
-      // Write remaining requirements back to file
-      const remainingContent = Array.from(requirements.values()).join('\n');
-      fs.writeFileSync(mainReqPath, remainingContent);
-
-      // Install remaining requirements
-      execSync(`pip install -r ${mainReqPath} -t ${pythonPath}`, {
-        stdio: 'inherit'
-      });
-
-      this.serverless.cli.log('Successfully merged and installed requirements');
-    } catch (error) {
-      this.serverless.cli.log(`Warning: Failed to install requirements: ${error.message}`);
     }
   }
 
