@@ -99,8 +99,8 @@ class ServerlessDynamicFunctions {
       this.serverless.service.functions[functionName] = {
         name: truncatedName,
         handler: `functions/lib/${dirName}/handler.handler`,
-        timeout: 29,
-        memorySize: 128,
+        timeout: 900,
+        memorySize: 256,
         layers: [{ Ref: 'DependenciesLambdaLayer' }],
         environment: {API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}"},
         package: {
