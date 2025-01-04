@@ -1,3 +1,4 @@
+# functions/base/run_flow/handler.py
 import json
 import boto3
 import logging
@@ -31,6 +32,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Extract flow name from path parameters
         flow_name = event['pathParameters']['flow_name']
 
+        logger.info(f"Getting userId")
+        # Get user ID from JWT claims (HTTP API format)
+        user_id = event['requestContext']['authorizer']['jwt']['claims']['sub']
+        logger.info(f"userId: {user_id}")
+
         # Get the state machine ARN
         state_machine_arn = get_state_machine_arn(flow_name)
 
@@ -39,10 +45,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if event.get('body'):
             body = json.loads(event['body'])
 
-        # Start the state machine execution
+        # Add user ID to input
+        execution_input = {
+            **body,
+            '__user_id': user_id
+        }
+
+        # Start the state machine execution with user ID
         response = sfn.start_execution(
             stateMachineArn=state_machine_arn,
-            input=json.dumps(body)
+            input=json.dumps(execution_input)
         )
 
         logger.info(f"Started execution of flow {flow_name} with ARN {response['executionArn']}")
