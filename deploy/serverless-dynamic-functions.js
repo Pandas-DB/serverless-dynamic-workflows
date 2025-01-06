@@ -66,7 +66,7 @@ class ServerlessDynamicFunctions {
   }
 
   addDynamicFunctions() {
-    // First handle local functions - KEEP THIS EXACTLY AS IS
+    // Handle local functions with base image
     const libDir = path.join(this.serverless.config.servicePath, 'functions', 'lib');
     this.serverless.cli.log(`Scanning for functions in: ${libDir}`);
 
@@ -96,17 +96,21 @@ class ServerlessDynamicFunctions {
       const fullName = `${this.serverless.service.service}-${this.serverless.service.provider.stage}-${functionName}`;
       const truncatedName = this.truncateName(fullName);
 
+      // Use base image for public functions
       this.serverless.service.functions[functionName] = {
         name: truncatedName,
-        handler: `functions/lib/${dirName}/handler.handler`,
+        logicalId: functionName,
+        image: {
+          name: 'baseimage',
+          command: [`functions/lib/${dirName}/handler.handler`]
+        },
         timeout: 900,
         memorySize: 256,
-        layers: [{ Ref: 'DependenciesLambdaLayer' }],
-        environment: {API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}"},
-        package: {
-          patterns: [
-            `functions/lib/${dirName}/**`
-          ]
+        environment: {
+          API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}",
+          POWERTOOLS_SERVICE_NAME: "${self:service}",
+          LOG_LEVEL: "INFO",
+          DEPLOYMENT_REGION: "${self:provider.region}"
         },
         events: [{
           httpApi: {
@@ -120,52 +124,56 @@ class ServerlessDynamicFunctions {
       };
     });
 
-    // Then handle plugin functions
+    // Handle plugin functions with heavy image
     const plugins = this.serverless.service.custom?.plugins?.packages || [];
     plugins.forEach(pluginPath => {
-      try {
+    try {
         let modulePath = pluginPath;
         let repoName = '';
 
         if (pluginPath.startsWith('git+')) {
-          repoName = pluginPath.split('/').pop().replace('.git', '');
-          modulePath = path.join(process.cwd(), '.plugins', repoName);
+            repoName = pluginPath.split('/').pop().replace('.git', '');
+            modulePath = path.join(process.cwd(), '.plugins', repoName);
         }
 
         const pluginModule = require(modulePath);
         if (typeof pluginModule.getFunctions === 'function') {
-          const pluginFunctions = pluginModule.getFunctions();
-          Object.entries(pluginFunctions).forEach(([name, config]) => {
-            // Use the same normalization as public functions
-            const nameWithoutLib = name.replace(/^lib/, '');
-            const normalizedName = this.normalizeFunctionName(nameWithoutLib);
-            const functionName = `privateLib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
-            const fullName = `${this.serverless.service.service}-${this.serverless.service.provider.stage}-${functionName}`;
-            const truncatedName = this.truncateName(fullName);
+            const pluginFunctions = pluginModule.getFunctions();
+            Object.entries(pluginFunctions).forEach(([name, config]) => {
+                const nameWithoutLib = name.replace(/^lib/, '');
+                const normalizedName = this.normalizeFunctionName(nameWithoutLib);
+                const functionName = `PrivateLib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+                const fullName = `${this.serverless.service.service}-${this.serverless.service.provider.stage}-${functionName}`;
+                const truncatedName = this.truncateName(fullName);
 
-            this.serverless.service.functions[functionName] = {
-              ...config,
-              name: truncatedName,
-              layers: [{ Ref: 'DependenciesLambdaLayer' }],
-              environment: {
-                ...(config.environment || {}),
-                PYTHONPATH: `/opt/python/lib/python3.9/site-packages:/var/task/.plugins/${repoName}`,
-                API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}"
-              },
-              package: {
-                patterns: [
-                  ...(config.package?.patterns || []),
-                  `.plugins/${repoName}/functions/**/*.py`,
-                  `.plugins/${repoName}/functions/**/__init__.py`
-                ]
-              }
-            };
-          });
+                // Create new config without handler property
+                const { handler, ...configWithoutHandler } = config;
+
+                // Use heavy image for plugin functions
+                this.serverless.service.functions[functionName] = {
+                    ...configWithoutHandler,
+                    name: truncatedName,
+                    logicalId: functionName,
+                    image: {
+                        name: 'heavyimage',
+                        command: [handler]  // Use the handler value here
+                    },
+                    environment: {
+                        ...(config.environment || {}),
+                        // Updated PYTHONPATH for container environment
+                        PYTHONPATH: '/var/task:/var/task/.plugins/${repoName}',
+                        API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}",
+                        POWERTOOLS_SERVICE_NAME: "${self:service}",
+                        LOG_LEVEL: "INFO",
+                        DEPLOYMENT_REGION: "${self:provider.region}"
+                    }
+                };
+            });
         }
-      } catch (error) {
+    } catch (error) {
         this.serverless.cli.log(`Warning: Failed to load plugin ${pluginPath}: ${error.message}`);
-      }
-    });
+    }
+});
 
     this.serverless.cli.log(`Total functions added: ${Object.keys(this.serverless.service.functions).length}`);
   }

@@ -1,4 +1,4 @@
-# flows/helloWorldFlow.yml
+# flows/helloWorldFlow
 name: helloWorldFlow
 description: A simple hello world workflow
 definition:
@@ -6,10 +6,9 @@ definition:
   States:
     HelloWorld:
       Type: Task
-      Resource: "${HelloWorldFunctionArn}"
+      Resource: "${libHelloWorldArn}"
       End: true
 
 functions:
-  - name: HelloWorldFunction
+  - name: libHelloWorld
     handler: functions/lib/hello_world/handler.handler
-    runtime: python3.9

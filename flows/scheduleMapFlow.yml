@@ -1,8 +1,8 @@
-# flows/scheduledMapFlow.yml
+# flows/scheduledMapFlow
 name: scheduledMapFlow
 description: A workflow that runs for multiple cases on schedule
-schedule: cron(0 12 * * ? *)  # Runs daily at 12 PM UTC
-input:  # Directly specify the input here
+schedule: cron(0 12 * * ? *)
+input:
   cases:
     - id: "case1"
       variables:
@@ -16,9 +16,6 @@ input:  # Directly specify the input here
       variables:
         param1: "value3"
         param2: 789
-    # One can add N more cases here.
-    # Note this is a good solution when we have few cases and no secret variables to pass
-    #  otherwise there are better solutions to be implemented
 
 definition:
   StartAt: ProcessAllCases
@@ -34,11 +31,10 @@ definition:
         States:
           HelloWorld:
             Type: Task
-            Resource: "${HelloWorldFunctionArn}"
+            Resource: "${libHelloWorldArn}"
             End: true
       End: true
 
 functions:
-  - name: HelloWorldFunction
+  - name: libHelloWorld
     handler: functions/lib/hello_world/handler.handler
-    runtime: python3.9
