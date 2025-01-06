@@ -1,4 +1,4 @@
-# flows/compositeFlow.yml
+# flows/compositeFlow
 name: compositeFlow
 description: A workflow that combines multiple flows with parallel and sequential execution
 definition:
@@ -13,7 +13,7 @@ definition:
             Type: Task
             Resource: "arn:aws:states:::states:startExecution"
             Parameters:
-              StateMachineArn: "${helloWorldFlowStateMachine}"
+              StateMachineArn: "${helloWorldFlow}"  # Make sure this matches the name in helloWorldFlow.yml
               Input.$: "$"
             End: true
       - StartAt: Flow2
@@ -22,7 +22,7 @@ definition:
             Type: Task
             Resource: "arn:aws:states:::states:startExecution"
             Parameters:
-              StateMachineArn: "${helloWorldFlowStateMachine}"
+              StateMachineArn: "${helloWorldFlow}"  # Make sure this matches the name in helloWorldFlow.yml
               Input.$: "$"
             End: true
       Next: Flow3
@@ -30,11 +30,10 @@ definition:
       Type: Task
       Resource: "arn:aws:states:::states:startExecution"
       Parameters:
-        StateMachineArn: "${dummy2StepFlowStateMachine}"
+        StateMachineArn: "${dummy2StepFlow}"  # Make sure this matches the name in dummy2StepFlow.yml
         Input.$: "$"
       End: true
 
-# We need to reference the other state machines that will be called
 stateMachineReferences:
-  - helloWorldFlowStateMachine
-  - dummy2StepFlowStateMachine
+  - helloWorldFlow
+  - dummy2StepFlow

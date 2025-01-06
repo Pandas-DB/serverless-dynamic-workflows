@@ -103,10 +103,10 @@ module.exports = async () => {
           .replace(/-/g, '_')
           .replace(/[^a-zA-Z0-9_]/g, '')
           .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-        const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+        const functionName = `Lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
 
         variables[`${func.name}Arn`] = {
-          'Fn::GetAtt': [`${functionName}`, 'Arn']
+          'Fn::GetAtt': [`${functionName}LambdaFunction`, 'Arn']
         };
       });
     }
@@ -115,7 +115,7 @@ module.exports = async () => {
     if (flowContent.stateMachineReferences) {
       flowContent.stateMachineReferences.forEach(stateMachineName => {
         variables[stateMachineName] = {
-          'Fn::GetAtt': [`${stateMachineName}`, 'Arn']
+          'Fn::GetAtt': [`${stateMachineName}StateMachine`, 'Arn']
         };
       });
     }
@@ -129,7 +129,7 @@ module.exports = async () => {
             .replace(/-/g, '_')
             .replace(/[^a-zA-Z0-9_]/g, '')
             .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-          return `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+          return `Lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}LambdaFunction`;
         })
       : [];
 
@@ -205,10 +205,10 @@ module.exports = async () => {
                 .replace(/-/g, '_')
                 .replace(/[^a-zA-Z0-9_]/g, '')
                 .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-              const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+              const functionName = `PrivateLib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
 
               variables[`${func.name}Arn`] = {
-                'Fn::GetAtt': [`${functionName}`, 'Arn']
+                'Fn::GetAtt': [`${functionName}LambdaFunction`, 'Arn']
               };
             });
           }
@@ -217,7 +217,7 @@ module.exports = async () => {
           if (flowContent.stateMachineReferences) {
             flowContent.stateMachineReferences.forEach(stateMachineName => {
               variables[stateMachineName] = {
-                'Fn::GetAtt': [`${stateMachineName}`, 'Arn']
+                'Fn::GetAtt': [`${stateMachineName}StateMachine`, 'Arn']
               };
             });
           }
@@ -231,7 +231,7 @@ module.exports = async () => {
                   .replace(/-/g, '_')
                   .replace(/[^a-zA-Z0-9_]/g, '')
                   .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-                return `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+                return `PrivateLib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}LambdaFunction`;
               })
             : [];
 

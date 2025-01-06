@@ -94,6 +94,13 @@ COPY .plugins/ ./.plugins/
 # Create necessary __init__.py files
 RUN find functions .plugins -type d -exec touch {}/__init__.py \\;
 
+# Create symlinks for plugin functions
+RUN for plugin in .plugins/*; do \\
+      if [ -d "$plugin/functions/lib" ]; then \\
+        cp -r $plugin/functions/lib/* functions/lib/; \\
+      fi \\
+    done
+
 CMD ["handler.handler"]`;
 
    // Write Dockerfiles

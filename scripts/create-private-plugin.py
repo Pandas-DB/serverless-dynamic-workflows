@@ -20,9 +20,63 @@ def create_plugin_structure(target_dir: str = 'private-workflows'):
         (target_dir / dir_path).mkdir(parents=True, exist_ok=True)
 
     # Create index.js content
-    index_content = '''const fs = require('fs');
+    index_content = '''// index.js
+const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
+
+function checkFileConflict(sourcePath, targetPath, fileName) {
+  if (fs.existsSync(targetPath) && !fileName.endsWith('requirements.txt')) {
+    throw new Error(`Conflict: File ${fileName} already exists in target path ${targetPath}`);
+  }
+}
+
+function copyDirectory(source, target, exclude = []) {
+  if (!fs.existsSync(target)) {
+    fs.mkdirSync(target, { recursive: true });
+  }
+
+  const files = fs.readdirSync(source);
+  files.forEach(file => {
+    if (exclude.some(pattern => file.includes(pattern))) {
+      return;
+    }
+
+    const sourcePath = path.join(source, file);
+    const targetPath = path.join(target, file);
+    const stat = fs.statSync(sourcePath);
+
+    if (stat.isDirectory()) {
+      copyDirectory(sourcePath, targetPath, exclude);
+    } else {
+      checkFileConflict(sourcePath, targetPath, file);
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+  });
+}
+
+function mergeRequirements(privateReqs, publicReqsPath) {
+  let requirements = new Set();
+
+  if (fs.existsSync(privateReqs)) {
+    const privateContent = fs.readFileSync(privateReqs, 'utf8');
+    privateContent.split('\n').forEach(line => {
+      if (line.trim()) requirements.add(line.trim());
+    });
+  }
+
+  if (fs.existsSync(publicReqsPath)) {
+    const publicContent = fs.readFileSync(publicReqsPath, 'utf8');
+    publicContent.split('\n').forEach(line => {
+      const req = line.trim();
+      if (req && !requirements.has(req)) {
+        requirements.add(req);
+      }
+    });
+  }
+
+  return Array.from(requirements).join('\n');
+}
 
 module.exports = {
   getFlows() {
@@ -46,37 +100,72 @@ module.exports = {
   getFunctions() {
     const libDir = path.join(__dirname, 'functions', 'lib');
     const functions = {};
+    const repoName = path.basename(__dirname);
 
     if (fs.existsSync(libDir)) {
       const functionDirs = fs.readdirSync(libDir);
       functionDirs.forEach(dir => {
-        if (!fs.statSync(path.join(libDir, dir)).isDirectory()) return;
-
-        functions[dir] = {
-          handler: `functions/lib/${dir}/handler.handler`,
-          events: [{
-            httpApi: {
-              path: `/lib/${dir}`,
-              method: 'POST',
-              authorizer: {
-                name: 'cognitoAuthorizer'
+        const functionPath = path.join(libDir, dir);
+        if (fs.statSync(functionPath).isDirectory()) {
+          const functionName = `lib${dir.charAt(0).toUpperCase() + dir.slice(1)}`;
+          functions[functionName] = {
+            handler: `functions/lib/${dir}/handler.handler`,  // Keep original format, no .plugins prefix
+            events: [
+              {
+                httpApi: {
+                  path: `/lib/${dir}`,
+                  method: 'POST',
+                  authorizer: {
+                    name: 'cognitoAuthorizer'
+                  }
+                }
               }
-            }
-          }],
-          package: {
-            patterns: [`functions/lib/${dir}/**`]
-          },
-          layers: [{ Ref: 'DependenciesLambdaLayer' }],
-          environment: {
-            API_USAGE_TABLE: "${self:service}-api-usage-${self:provider.stage}"
-          }
-        };
+            ],
+            package: {
+              patterns: [`functions/lib/${dir}/**`]
+            },
+          };
+        }
       });
     }
 
     return functions;
+  },
+
+  deployPlugin(serverless) {
+    const publicRoot = path.join(process.cwd());
+    const excludePatterns = ['__pycache__', '.pyc'];
+
+    // Copy functions/lib
+    const sourceLibDir = path.join(__dirname, 'functions', 'lib');
+    const targetLibDir = path.join(publicRoot, 'functions', 'lib');
+    if (fs.existsSync(sourceLibDir)) {
+      copyDirectory(sourceLibDir, targetLibDir, excludePatterns);
+    }
+
+    // Copy tests
+    const sourceTestsDir = path.join(__dirname, 'tests');
+    const targetTestsDir = path.join(publicRoot, 'test');
+    if (fs.existsSync(sourceTestsDir)) {
+      copyDirectory(sourceTestsDir, targetTestsDir, excludePatterns);
+    }
+
+    // Merge requirements.txt
+    const privateReqs = path.join(__dirname, 'requirements.txt');
+    const publicReqs = path.join(publicRoot, 'requirements.txt');
+    const mergedContent = mergeRequirements(privateReqs, publicReqs);
+    fs.writeFileSync(publicReqs, mergedContent);
+
+    // Register functions with serverless-dynamic-functions
+    const pluginFunctions = this.getFunctions();
+    if (serverless.service.functions) {
+      Object.assign(serverless.service.functions, pluginFunctions);
+    } else {
+      serverless.service.functions = pluginFunctions;
+    }
   }
-};'''
+};
+    '''
 
     # Create package.json content
     package_content = {

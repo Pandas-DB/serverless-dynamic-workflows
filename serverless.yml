@@ -9,6 +9,14 @@ provider:
   tracing:
     lambda: true
     apiGateway: true
+  ecr: # Add this section
+    images:
+      baseimage:
+        path: ./
+        file: Dockerfile.base
+      heavyimage:
+        path: ./
+        file: Dockerfile.heavy
 
   environment:
     POWERTOOLS_SERVICE_NAME: ${self:service}
@@ -57,14 +65,11 @@ package:
 
 functions:
   getAuthConfig:
-    handler: functions/base/auth/handler.get_config
+    image:
+      name: baseimage
+      command: ["functions/base/auth/handler.get_config"]
     timeout: 30
     memorySize: 128
-    package:
-      patterns:
-        - "functions/base/auth/**"
-    layers:
-      - {Ref: DependenciesLambdaLayer}
     environment:
       COGNITO_USER_POOL_ID: !Ref CognitoUserPool
       COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
@@ -76,14 +81,11 @@ functions:
           method: GET
 
   verifyToken:
-    handler: functions/base/auth/handler.verify_token
+    image:
+      name: baseimage
+      command: ["functions/base/auth/handler.verify_token"]
     timeout: 30
     memorySize: 128
-    package:
-      patterns:
-        - "functions/base/auth/**"
-    layers:
-      - {Ref: DependenciesLambdaLayer}
     environment:
       POWERTOOLS_METRICS_NAMESPACE: ${self:service}-auth
       API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
@@ -95,14 +97,11 @@ functions:
             name: cognitoAuthorizer
 
   runFlow:
-    handler: functions/base/run_flow/handler.handler
+    image:
+      name: baseimage
+      command: ["functions/base/run_flow/handler.handler"]
     timeout: 30
     memorySize: 256
-    package:
-      patterns:
-        - "functions/base/run_flow/**"
-    layers:
-      - {Ref: DependenciesLambdaLayer}
     environment:
       POWERTOOLS_METRICS_NAMESPACE: ${self:service}-events-producer
       API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
@@ -114,30 +113,27 @@ functions:
             name: cognitoAuthorizer
 
   listFlows:
-      handler: functions/base/list_flows/handler.handler
-      timeout: 30
-      memorySize: 256
-      package:
-        patterns:
-          - "functions/base/list_flows/**"
-      layers:
-        - {Ref: DependenciesLambdaLayer}
-      environment:
-        POWERTOOLS_METRICS_NAMESPACE: ${self:service}-flows
-        API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
-      events:
-        - httpApi:
-            path: /flows
-            method: GET
-            authorizer:
-              name: cognitoAuthorizer
-
-  getFlowResult:
-    handler: functions/base/get_flow_result/handler.handler
+    image:
+      name: baseimage
+      command: ["functions/base/list_flows/handler.handler"]
     timeout: 30
     memorySize: 256
-    layers:
-      - { Ref: DependenciesLambdaLayer }
+    environment:
+      POWERTOOLS_METRICS_NAMESPACE: ${self:service}-flows
+      API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
+    events:
+      - httpApi:
+          path: /flows
+          method: GET
+          authorizer:
+            name: cognitoAuthorizer
+
+  getFlowResult:
+    image:
+      name: baseimage
+      command: ["functions/base/get_flow_result/handler.handler"]
+    timeout: 30
+    memorySize: 256
     environment:
       API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
     events:
@@ -148,11 +144,11 @@ functions:
             name: cognitoAuthorizer
 
   listRuns:
-    handler: functions/base/list_runs/handler.handler
+    image:
+      name: baseimage
+      command: ["functions/base/list_runs/handler.handler"]
     timeout: 30
     memorySize: 256
-    layers:
-      - { Ref: DependenciesLambdaLayer }
     environment:
       POWERTOOLS_METRICS_NAMESPACE: ${self:service}-executions
       API_USAGE_TABLE: ${self:service}-api-usage-${self:provider.stage}
@@ -165,14 +161,7 @@ functions:
 
 plugins:
   - ./deploy/serverless-dynamic-functions.js
-  - ./deploy/setup-layer.js
-
-layers:
-  dependencies:
-    path: layer
-    description: Required dependencies for data frame processing
-    compatibleRuntimes:
-      - python3.9
+  - ./deploy/setup-containers.js
 
 resources:
   - ${file(./deploy/generate-step-functions.js)}

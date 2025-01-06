@@ -1,18 +1,17 @@
-# flows/scheduledFlow.yml
+# flows/scheduledFlow
 name: scheduledFlow
 description: A workflow that runs on a schedule
-schedule: cron(0 14 * * ? *)  # Runs daily at 2 PM UTC
-input:  # Optional static input that will be passed to the flow
+schedule: cron(0 14 * * ? *)
+input:
   message: "Scheduled execution"
 definition:
   StartAt: HelloWorld
   States:
     HelloWorld:
       Type: Task
-      Resource: "${HelloWorldFunctionArn}"
+      Resource: "${libHelloWorldArn}"
       End: true
 
 functions:
-  - name: HelloWorldFunction
+  - name: libHelloWorld
     handler: functions/lib/hello_world/handler.handler
-    runtime: python3.9

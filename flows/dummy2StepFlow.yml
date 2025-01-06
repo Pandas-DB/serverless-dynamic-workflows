@@ -1,4 +1,4 @@
-# flows/dummy2StepFlow.yml
+# flows/dummy2StepFlow
 name: dummy2StepFlow
 description: A dummy two-step data processing pipeline
 definition:
@@ -6,17 +6,15 @@ definition:
   States:
     HelloWorld:
       Type: Task
-      Resource: "${HelloWorldFunctionArn}"
+      Resource: "${libHelloWorldArn}"
       Next: DummyCheck
     DummyCheck:
       Type: Task
-      Resource: "${DummyCheckFunctionArn}"
+      Resource: "${libDummyCheckArn}"
       End: true
 
 functions:
-  - name: HelloWorldFunction
+  - name: libHelloWorld
     handler: functions/lib/hello_world/handler.handler
-    runtime: python3.9
-  - name: DummyCheckFunction
+  - name: libDummyCheck
     handler: functions/lib/dummy_check/handler.handler
-    runtime: python3.9

@@ -99,6 +99,7 @@ class ServerlessDynamicFunctions {
       // Use base image for public functions
       this.serverless.service.functions[functionName] = {
         name: truncatedName,
+        logicalId: functionName,
         image: {
           name: 'baseimage',
           command: [`functions/lib/${dirName}/handler.handler`]
@@ -141,7 +142,7 @@ class ServerlessDynamicFunctions {
             Object.entries(pluginFunctions).forEach(([name, config]) => {
                 const nameWithoutLib = name.replace(/^lib/, '');
                 const normalizedName = this.normalizeFunctionName(nameWithoutLib);
-                const functionName = `privateLib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+                const functionName = `PrivateLib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
                 const fullName = `${this.serverless.service.service}-${this.serverless.service.provider.stage}-${functionName}`;
                 const truncatedName = this.truncateName(fullName);
 
@@ -152,6 +153,7 @@ class ServerlessDynamicFunctions {
                 this.serverless.service.functions[functionName] = {
                     ...configWithoutHandler,
                     name: truncatedName,
+                    logicalId: functionName,
                     image: {
                         name: 'heavyimage',
                         command: [handler]  // Use the handler value here
