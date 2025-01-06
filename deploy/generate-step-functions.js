@@ -40,7 +40,7 @@ module.exports = async () => {
             Effect: 'Allow',
             Action: [
               'lambda:InvokeFunction',
-              'states:StartExecution'  // Added this permission
+              'states:StartExecution'
             ],
             Resource: '*'
           }]
@@ -106,7 +106,7 @@ module.exports = async () => {
         const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
 
         variables[`${func.name}Arn`] = {
-          'Fn::GetAtt': ['LibHelloWorldLambdaFunction', 'Arn']
+          'Fn::GetAtt': [`${functionName}`, 'Arn']
         };
       });
     }
@@ -120,9 +120,22 @@ module.exports = async () => {
       });
     }
 
+    // Get function dependencies
+    const functionDependencies = flowContent.functions
+      ? flowContent.functions.map(func => {
+          const handlerParts = func.handler.split('/');
+          const functionDir = handlerParts[handlerParts.length - 2];
+          const normalizedName = functionDir
+            .replace(/-/g, '_')
+            .replace(/[^a-zA-Z0-9_]/g, '')
+            .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+          return `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+        })
+      : [];
+
     resources[`${flowContent.name}StateMachine`] = {
       Type: 'AWS::StepFunctions::StateMachine',
-      DependsOn: ['StepFunctionsExecutionRole', 'StateMachineLogGroup'],
+      DependsOn: ['StepFunctionsExecutionRole', 'StateMachineLogGroup', ...functionDependencies],
       Properties: {
         StateMachineName: flowContent.name,
         DefinitionString: {
@@ -184,21 +197,21 @@ module.exports = async () => {
 
           // Handle function ARNs for plugin flows
           if (flowContent.functions) {
-          flowContent.functions.forEach(func => {
-            const handlerParts = func.handler.split('/');
-            const functionDir = handlerParts[handlerParts.length - 2];
+            flowContent.functions.forEach(func => {
+              const handlerParts = func.handler.split('/');
+              const functionDir = handlerParts[handlerParts.length - 2];
 
-            const normalizedName = functionDir
-              .replace(/-/g, '_')
-              .replace(/[^a-zA-Z0-9_]/g, '')
-              .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-            const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+              const normalizedName = functionDir
+                .replace(/-/g, '_')
+                .replace(/[^a-zA-Z0-9_]/g, '')
+                .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+              const functionName = `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
 
-            variables[`${func.name}Arn`] = {
-              'Fn::GetAtt': ['LibHelloWorldLambdaFunction', 'Arn']
-            };
-          });
-        }
+              variables[`${func.name}Arn`] = {
+                'Fn::GetAtt': [`${functionName}`, 'Arn']
+              };
+            });
+          }
 
           // Handle state machine references
           if (flowContent.stateMachineReferences) {
@@ -209,9 +222,22 @@ module.exports = async () => {
             });
           }
 
+          // Get function dependencies for plugin flows
+          const functionDependencies = flowContent.functions
+            ? flowContent.functions.map(func => {
+                const handlerParts = func.handler.split('/');
+                const functionDir = handlerParts[handlerParts.length - 2];
+                const normalizedName = functionDir
+                  .replace(/-/g, '_')
+                  .replace(/[^a-zA-Z0-9_]/g, '')
+                  .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+                return `lib${normalizedName.charAt(0).toUpperCase()}${normalizedName.slice(1)}`;
+              })
+            : [];
+
           resources[`${flowContent.name}StateMachine`] = {
             Type: 'AWS::StepFunctions::StateMachine',
-            DependsOn: ['StepFunctionsExecutionRole', 'StateMachineLogGroup'],
+            DependsOn: ['StepFunctionsExecutionRole', 'StateMachineLogGroup', ...functionDependencies],
             Properties: {
               StateMachineName: flowContent.name,
               DefinitionString: {
