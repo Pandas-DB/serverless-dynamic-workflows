@@ -158,6 +158,8 @@ class ServerlessDynamicFunctions {
                         name: 'heavyimage',
                         command: [handler]  // Use the handler value here
                     },
+                    timeout: 900,
+                    memorySize: 1024,
                     environment: {
                         ...(config.environment || {}),
                         // Updated PYTHONPATH for container environment
